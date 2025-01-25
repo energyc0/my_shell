@@ -1,8 +1,11 @@
+#include "cmd_exec.h"
+#include "utils.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define ARG_ALLOC 20
 
@@ -16,14 +19,10 @@ struct arg_buf{
 void add_arg(struct arg_buf* b, char* s){
     if(b->p_end >= b->sz){
         b->sz+=ARG_ALLOC;
-        char** np = realloc(b->argv, b->sz);
-        if (np == NULL) {
-            perror("realloc()");
-            exit(EXIT_FAILURE);
-        }
+        char** np = erealloc(b->argv, b->sz * sizeof(char*));
         b->argv = np;
     }
-    b->argv[b->p_end++] = s == NULL ? NULL : strdup(s);
+    b->argv[b->p_end++] = ((s == NULL) ? NULL : newstr(s));
 }
 
 char** arg_separator(char* arg_buf){
@@ -46,7 +45,87 @@ char** arg_separator(char* arg_buf){
 }
 
 int cmd_exec(char** args){
-    signal(SIGINT, SIG_DFL);
-    signal(SIGQUIT, SIG_DFL);
-    return execvp(args[0], args);
+    __pid_t r = fork();
+    if(r == -1){
+        perror("fork()");
+    }else if(r == 0){
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        if(execvp(args[0], args)){
+            perror(args[0]);
+            r = -1;
+        }
+    }else{
+        int stat_loc;
+        wait(&stat_loc);
+        r = WEXITSTATUS(stat_loc);
+    }
+    return r;
+}
+
+int is_if_keyword(char* s){
+    if(strcmp("if", s) == 0)
+        return CMDIF;
+    else if(strcmp("then", s) == 0 )
+        return CMDTHEN; 
+    else if(strcmp("fi", s)  == 0)
+        return CMDFI;
+    else if(strcmp("else", s) == 0)
+        return CMDELSE;
+    else
+        return 0;
+}
+
+char** if_statement_exec(char** args){
+    char** p = args;
+    int ret;
+    if((ret = is_if_keyword(*p++)) != CMDIF){
+        fprintf(stderr, "'if' expected\n");
+        return NULL;
+    }
+    if((ret = is_if_keyword(*p++))){
+        fprintf(stderr, "unexpected token\n");
+        return NULL;
+    }
+    while(*p && !(ret = is_if_keyword(*p))){
+        p++;
+    }
+    if(*p == NULL || ret != CMDTHEN){
+        fprintf(stderr, "'then' expected\n");
+        return NULL;
+    }
+
+    char* temp = *p;
+    *p = NULL;
+    ret = cmd_exec(args+1);
+    *p = temp;
+
+    if(ret == 0){
+        args = ++p;
+        while(*p && !(ret = is_if_keyword(*p))){
+            p++;
+        }
+        if (ret != CMDFI || *p == NULL) {
+            fprintf(stderr, "'fi' expected\n");
+            return NULL;
+        }
+        temp = *p;
+        *p = NULL;
+        cmd_exec(args);
+        *p++ = temp;
+    }/*else{
+        while(*p){
+            if((ret = is_if_keyword(*p)))
+            p++;
+        }
+    }
+    */
+    return p;
+}
+
+void free_arglist(char** args){
+    char** p = args;
+    while(*p)
+        free(*p++);
+    free(args);
 }

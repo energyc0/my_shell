@@ -23,12 +23,15 @@ int get_cmd(){
 
 void process_cmd(){
     char** args = arg_separator(cmd_buf);
-    __pid_t r = fork();
-    if(r == -1){
-        perror("fork()");
-    }else if(r == 0){
-        cmd_exec(args);
+    if (args[0] == NULL)
+        return;
+
+    int ret;
+    if((ret = is_if_keyword(args[0]))){
+        if_statement_exec(args);
     }else{
-        wait(NULL);
+        int res = cmd_exec(args);
+        printf("exited with status: %d\n", res);
     }
+    free_arglist(args);
 }
