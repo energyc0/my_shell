@@ -28,7 +28,7 @@ struct token** splitline_tokens(char* arg_buf){
     return arr.arr;
 }
 
-//free token ptr
+//free token ptr by calling free() on val and the token pointer
 void free_token(struct token* t){
     free(t->val);
     free(t);

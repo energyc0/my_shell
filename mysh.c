@@ -24,9 +24,12 @@ int get_cmd(){
 
 void process_cmd(){
     struct token** tok_vec = splitline_tokens(cmd_buf);
-    while (*tok_vec) {
-        print_token(*tok_vec++);
+    struct token** ptr = tok_vec;
+    while (*ptr) {
+        print_token(*ptr);
+        free_token(*ptr++);
     }
+    free(tok_vec);
     /*char** args = arg_separator(cmd_buf);
     if (args[0] == NULL)
         return;

@@ -18,7 +18,7 @@ typedef enum cmd_keyword_t{
     CMDEXIT
 } cmd_keyword_t;
 
-//free token ptr
+//free token ptr by calling free() on val and the token pointer
 void free_token(struct token* p);
 
 //allocate new token with TT_ARG token_type and copy string with malloc()
