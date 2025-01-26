@@ -64,7 +64,7 @@ int cmd_exec(char** args){
 }
 
 int is_if_keyword(char* s){
-    if(strcmp("if", s) == 0)
+    /*if(strcmp("if", s) == 0)
         return CMDIF;
     else if(strcmp("then", s) == 0 )
         return CMDTHEN; 
@@ -72,12 +72,12 @@ int is_if_keyword(char* s){
         return CMDFI;
     else if(strcmp("else", s) == 0)
         return CMDELSE;
-    else
+    else*/
         return 0;
 }
 
 char** if_statement_exec(char** args){
-    char** p = args;
+    /*char** p = args;
     int ret;
     if((ret = is_if_keyword(*p++)) != CMDIF){
         fprintf(stderr, "'if' expected\n");
@@ -113,14 +113,16 @@ char** if_statement_exec(char** args){
         *p = NULL;
         cmd_exec(args);
         *p++ = temp;
-    }/*else{
+    }else{
         while(*p){
             if((ret = is_if_keyword(*p)))
             p++;
         }
     }
-    */
+    
     return p;
+    */
+    return NULL;
 }
 
 void free_arglist(char** args){

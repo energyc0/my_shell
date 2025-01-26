@@ -1,5 +1,6 @@
 #include "cmd_exec.h"
 #include "mysh.h"
+#include "token.h"
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
@@ -22,7 +23,11 @@ int get_cmd(){
 }
 
 void process_cmd(){
-    char** args = arg_separator(cmd_buf);
+    struct token** tok_vec = splitline_tokens(cmd_buf);
+    while (*tok_vec) {
+        print_token(*tok_vec++);
+    }
+    /*char** args = arg_separator(cmd_buf);
     if (args[0] == NULL)
         return;
 
@@ -34,4 +39,8 @@ void process_cmd(){
         printf("exited with status: %d\n", res);
     }
     free_arglist(args);
+    */
+
+
+
 }
