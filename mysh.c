@@ -1,10 +1,13 @@
 #include "mysh.h"
+#include "cmd_exec.h"
 #include "token.h"
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
+
+#define PROMPT ">"
 
 char cmd_buf[BUFSIZ];
 
@@ -19,6 +22,7 @@ void setup_shell(){
 }
 
 int get_cmd(){
+    printf(PROMPT);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
         return 0;
     }
@@ -30,8 +34,7 @@ void process_cmd(){
     cmd_arr_t tok_vec = splitline_cmd(cmd_buf);
     cmd_arr_t ptr = tok_vec;
     while (*ptr) {
-        print_cmd(*ptr++);
-        putchar('\n');
+        cmd_exec(*ptr++);
     }
     free_cmd_arr(tok_vec);
 }

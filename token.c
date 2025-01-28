@@ -145,7 +145,7 @@ void free_cmd(cmd_t p){
 
 void free_cmd_arr(cmd_arr_t p){
     cmd_arr_t temp = p;
-        while(*p){
+    while(*p){
         free_cmd(*p++);
     }
     free(temp);
