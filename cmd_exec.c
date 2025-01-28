@@ -44,13 +44,18 @@ char** arg_separator(char* arg_buf){
     return b.argv;
 }
 
-int cmd_exec(char** args){
+int cmd_exec(cmd_t args){
     __pid_t r = fork();
     if(r == -1){
         perror("fork()");
     }else if(r == 0){
-        signal(SIGINT, SIG_DFL);
-        signal(SIGQUIT, SIG_DFL);
+        struct sigaction sgnl;
+        memset(&sgnl, 0, sizeof sgnl);
+        sgnl.sa_handler = SIG_DFL;
+        
+        sigaction(SIGINT, &sgnl, NULL);
+        sigaction(SIGQUIT, &sgnl, NULL);
+
         if(execvp(args[0], args)){
             perror(args[0]);
             r = -1;

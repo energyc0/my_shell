@@ -1,4 +1,3 @@
-#include "cmd_exec.h"
 #include "mysh.h"
 #include "token.h"
 #include <string.h>
@@ -28,13 +27,11 @@ int get_cmd(){
 }
 
 void process_cmd(){
-    cmd_arr_t* tok_vec = splitline_cmd(cmd_buf);
-    cmd_arr_t* ptr = tok_vec;
+    cmd_arr_t tok_vec = splitline_cmd(cmd_buf);
+    cmd_arr_t ptr = tok_vec;
     while (*ptr) {
         print_cmd(*ptr++);
         putchar('\n');
     }
     free_cmd_arr(tok_vec);
-
-
 }

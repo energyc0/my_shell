@@ -1,3 +1,6 @@
+#ifndef TOKEN_H
+#define  TOKEN_H
+
 #include <stdlib.h>
 
 typedef enum token_type{
@@ -5,10 +8,9 @@ typedef enum token_type{
     TT_KEYWORD
 } token_type;
 
-struct token{
-    char* val;
-    token_type t;
-};
+typedef char* token_t;
+typedef token_t* cmd_t;
+typedef cmd_t* cmd_arr_t;
 
 typedef enum cmd_keyword_t{
     CMDIF=1,
@@ -18,49 +20,53 @@ typedef enum cmd_keyword_t{
     CMDEXIT
 } cmd_keyword_t;
 
-//free token ptr by calling free() on val and the token pointer
-void free_token(struct token* p);
+//just free()
+#define FREE_TOKEN(p) {free(p);}
 
 //allocate new token with TT_ARG token_type and copy string with malloc()
-struct token* alloc_arg_token(char* s);
+//token alloc_arg_token(char* s);
 
 //allocate new token with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-struct token* alloc_key_token(cmd_keyword_t t);
+//token* alloc_key_token(cmd_keyword_t t);
 
 //init token with TT_ARG token_type and copy string with malloc()
-void init_arg_token(struct token* p, char* s);
+//void init_arg_token(token* p, char* s);
 
 //inittoken with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-void init_key_token(struct token* p, cmd_keyword_t t);
+//void init_key_token(token* p, cmd_keyword_t t);
+
+//allocate new token, must call free_token()
+token_t mktoken(char* s);
 
 //print token value
-void print_token(const struct token* p);
+void print_token(const token_t p);
 
 struct token_arr{
-    struct token** arr;
+    token_t* arr;
     size_t sz;
     size_t p;
 };
 
 //push token allocated with alloc_*_token() to the token_arr and allocate new space if needed
-void push_token(struct token_arr* p, struct token* t);
+void push_token(struct token_arr* p, token_t t);
 
 //call free() on every token_arr entry and on the array, make arr->sz = 0
 void clear_token_arr(struct token_arr* arr);
 
 
-typedef struct token** cmd_arr_t;
 //allocate command array, must call free()
-cmd_arr_t* splitline_cmd(char* cmd_buf);
+cmd_arr_t splitline_cmd(char* cmd_buf);
 
-//allocate token array with NULL end identifier, must call free()
-struct token** splitcmd_tokens(char* cmd_buf);
+//allocate cmd_t with NULL end identifier, must call free()
+cmd_t splitcmd_tokens(char* cmd_buf);
 
 //print cmd
-void print_cmd(struct token** cmd);
+void print_cmd(cmd_t cmd);
 
 //free cmd pointer
-void free_cmd(struct token** p);
+void free_cmd(cmd_t p);
 
 //free cmd_arr_t pointer
-void free_cmd_arr(cmd_arr_t* p);
+void free_cmd_arr(cmd_arr_t p);
+
+#endif
