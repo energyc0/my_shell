@@ -3,25 +3,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
-//allocate token array with NULL end identifier, must call free();
-struct token** splitline_tokens(char* arg_buf){
+#define MAX_COMMANDS_PER_LINE 64
+
+//allocate command array, must call free()
+cmd_arr_t* splitline_cmd(char* arg_buf){
     char* prev = arg_buf;
     char* p = arg_buf;
+
+    cmd_arr_t* cmds = emalloc(sizeof(cmd_arr_t) * MAX_COMMANDS_PER_LINE);
+    int i = 0;
+    while (*p) {
+        while (*p != '\0' && *p != ';') p++;
+
+        if(i >= MAX_COMMANDS_PER_LINE-1)
+            break;
+        char ch = *p;
+        *p = '\0';
+        cmds[i++] = splitcmd_tokens(prev);
+        if((*p = ch) == '\0')
+            break;
+
+        prev = ++p;
+    }
+    cmds[i] = NULL;
+    return cmds;
+}
+
+//allocate token array with NULL end identifier, must call free();
+struct token** splitcmd_tokens(char* cmd_buf){
+    char* p = cmd_buf;
 
     struct token_arr arr;
     memset(&arr, 0, sizeof arr);
 
-    for (; *p ; p++) {
+    while(isspace(*p)) p++;
+    for (char* prev = p; *p ; prev = p) {
         while(*p != ' ' && *p != '\0') p++;
-        
+
         char ch = *p;
         *p = '\0';
         push_token(&arr, alloc_arg_token(prev));
         if((*p = ch) == '\0')
             break;
 
-        prev = p+1;
+        while(isspace(*p)) p++;
     }
 
     push_token(&arr, NULL);
@@ -97,9 +124,32 @@ void print_token(const struct token* p){
         fprintf(stderr, "token is NULL!\n");
     }else{
         switch (p->t) {
-            case TT_ARG: printf("%s\n", p->val); break;
-            case TT_KEYWORD: printf("%s\n", get_keyword_str(*p->val)); break;
-            default: fprintf(stderr, "undefined token type!\n");break;
+            case TT_ARG: printf("%s", p->val); break;
+            case TT_KEYWORD: printf("%s", get_keyword_str(*p->val)); break;
+            default: fprintf(stderr, "undefined token type!");break;
         }
     }
+}
+//print cmd
+void print_cmd(struct token** cmd){
+    while (*cmd) {
+        print_token(*cmd++);
+        putchar(' ');
+    }
+}
+
+void free_cmd(struct token** p){
+    struct token** temp = p;
+    while(*p){
+        free_token(*p++);
+    }
+    free(temp);
+}
+
+void free_cmd_arr(cmd_arr_t* p){
+    cmd_arr_t* temp = p;
+        while(*p){
+        free_cmd(*p++);
+    }
+    free(temp);
 }

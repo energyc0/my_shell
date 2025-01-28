@@ -48,5 +48,19 @@ void push_token(struct token_arr* p, struct token* t);
 //call free() on every token_arr entry and on the array, make arr->sz = 0
 void clear_token_arr(struct token_arr* arr);
 
-//allocate token array with NULL end identifier, must call free();
-struct token** splitline_tokens(char* arg_buf);
+
+typedef struct token** cmd_arr_t;
+//allocate command array, must call free()
+cmd_arr_t* splitline_cmd(char* cmd_buf);
+
+//allocate token array with NULL end identifier, must call free()
+struct token** splitcmd_tokens(char* cmd_buf);
+
+//print cmd
+void print_cmd(struct token** cmd);
+
+//free cmd pointer
+void free_cmd(struct token** p);
+
+//free cmd_arr_t pointer
+void free_cmd_arr(cmd_arr_t* p);

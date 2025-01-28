@@ -10,8 +10,13 @@
 char cmd_buf[BUFSIZ];
 
 void setup_shell(){
-    signal(SIGINT, SIG_IGN);
-    signal(SIGQUIT, SIG_IGN);
+    struct sigaction sgnl;
+    memset(&sgnl, 0, sizeof sgnl);
+
+    sgnl.sa_flags = SA_RESTART;
+    sgnl.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &sgnl, NULL);
+    sigaction(SIGQUIT, &sgnl, NULL);
 }
 
 int get_cmd(){
@@ -23,27 +28,13 @@ int get_cmd(){
 }
 
 void process_cmd(){
-    struct token** tok_vec = splitline_tokens(cmd_buf);
-    struct token** ptr = tok_vec;
+    cmd_arr_t* tok_vec = splitline_cmd(cmd_buf);
+    cmd_arr_t* ptr = tok_vec;
     while (*ptr) {
-        print_token(*ptr);
-        free_token(*ptr++);
+        print_cmd(*ptr++);
+        putchar('\n');
     }
-    free(tok_vec);
-    /*char** args = arg_separator(cmd_buf);
-    if (args[0] == NULL)
-        return;
-
-    int ret;
-    if((ret = is_if_keyword(args[0]))){
-        if_statement_exec(args);
-    }else{
-        int res = cmd_exec(args);
-        printf("exited with status: %d\n", res);
-    }
-    free_arglist(args);
-    */
-
+    free_cmd_arr(tok_vec);
 
 
 }
