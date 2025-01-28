@@ -14,7 +14,12 @@ cmd_arr_t splitline_cmd(char* arg_buf){
 
     cmd_arr_t cmds = emalloc(sizeof(cmd_arr_t) * MAX_COMMANDS_PER_LINE);
     int i = 0;
-    while (*p) {
+
+    while (1) {
+        while (*p != '\0' && (isspace(*p) || *p == ';')) p++;
+        if(*p == '\0')
+            break;
+        prev = p;
         while (*p != '\0' && *p != ';') p++;
 
         if(i >= MAX_COMMANDS_PER_LINE-1)
@@ -38,51 +43,22 @@ cmd_t splitcmd_tokens(char* cmd_buf){
     struct token_arr arr;
     memset(&arr, 0, sizeof arr);
 
-    while(isspace(*p)) p++;
-    for (char* prev = p; *p ; prev = p) {
-        while(*p != ' ' && *p != '\0') p++;
+    for (char* prev; *p ; prev = p) {
+        while(*p != '\0' && isspace(*p)) p++;
+        prev = p;
+        while(*p != '\0' && !isspace(*p)) p++;
 
         char ch = *p;
         *p = '\0';
         push_token(&arr, mktoken(prev));
-        if((*p = ch) == '\0')
+        if((*p++ = ch) == '\0')
             break;
 
-        while(isspace(*p)) p++;
     }
 
     push_token(&arr, NULL);
     return arr.arr;
 }
-
-/*
-//allocate new token with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-token alloc_key_token(){
-    token ptr = emalloc(sizeof(token));
-    init_key_token(ptr, t);
-    return ptr;
-}
-
-//allocate new token with TT_ARG token_type and copy string with malloc()
-struct token* alloc_arg_token(char* s){
-    struct token* ptr = emalloc(sizeof(struct token));
-    init_arg_token(ptr, s);
-    return ptr;
-}
-
-//init token with TT_ARG token_type and copy string with malloc()
-void init_arg_token(struct token* p, char* s){
-    p->val = newstr(s);
-    p->t = TT_ARG;
-}
-
-//inittoken with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-void init_key_token(struct token* p, cmd_keyword_t t){
-    p->val = emalloc(sizeof(cmd_keyword_t));
-    *p->val = t;
-    p->t = TT_KEYWORD;
-}
-*/
 
 //allocate new token, must call free_token()
 token_t mktoken(char* s){
@@ -112,11 +88,6 @@ void clear_token_arr(struct token_arr* arr){
     arr->arr = NULL;
     arr->p = 0;
     arr->sz = 0;
-}
-
-char* get_keyword_str(cmd_keyword_t t){    
-    static char* strs[] = {NULL, "IF", "THEN", "ELSE", "FI", "EXIT"};
-    return strs[t];
 }
 
 //print token value

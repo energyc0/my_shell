@@ -3,37 +3,12 @@
 
 #include <stdlib.h>
 
-typedef enum token_type{
-    TT_ARG,
-    TT_KEYWORD
-} token_type;
-
 typedef char* token_t;
 typedef token_t* cmd_t;
 typedef cmd_t* cmd_arr_t;
 
-typedef enum cmd_keyword_t{
-    CMDIF=1,
-    CMDTHEN,
-    CMDELSE,
-    CMDFI,
-    CMDEXIT
-} cmd_keyword_t;
-
 //just free()
 #define FREE_TOKEN(p) {free(p);}
-
-//allocate new token with TT_ARG token_type and copy string with malloc()
-//token alloc_arg_token(char* s);
-
-//allocate new token with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-//token* alloc_key_token(cmd_keyword_t t);
-
-//init token with TT_ARG token_type and copy string with malloc()
-//void init_arg_token(token* p, char* s);
-
-//inittoken with TT_KEYWORD token type and copy cmd_keyword_t with malloc()
-//void init_key_token(token* p, cmd_keyword_t t);
 
 //allocate new token, must call free_token()
 token_t mktoken(char* s);

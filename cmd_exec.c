@@ -1,48 +1,10 @@
 #include "cmd_exec.h"
-#include "utils.h"
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
-#define ARG_ALLOC 20
-
-struct arg_buf{
-    char** argv;
-    size_t p_end;
-    size_t sz;
-};
-
-
-void add_arg(struct arg_buf* b, char* s){
-    if(b->p_end >= b->sz){
-        b->sz+=ARG_ALLOC;
-        char** np = erealloc(b->argv, b->sz * sizeof(char*));
-        b->argv = np;
-    }
-    b->argv[b->p_end++] = ((s == NULL) ? NULL : newstr(s));
-}
-
-char** arg_separator(char* arg_buf){
-    struct arg_buf b;
-    memset(&b, 0, sizeof b);
-
-    char* p = arg_buf;
-    char* prev = arg_buf;
-    while (*prev) {
-        while (*p != '\0' && *p != ' ') p++;
-        char ch = *p;
-        *p = '\0';
-        add_arg(&b, prev);
-        if((*p = ch) == '\0')
-            break; 
-        prev = ++p;
-    }
-    add_arg(&b, NULL);
-    return b.argv;
-}
 
 int cmd_exec(cmd_t args){
     __pid_t r = fork();
@@ -68,8 +30,8 @@ int cmd_exec(cmd_t args){
     return r;
 }
 
-int is_if_keyword(char* s){
-    /*if(strcmp("if", s) == 0)
+cmd_keyword_t get_keyword_type(char* s){
+    if(strcmp("if", s) == 0)
         return CMDIF;
     else if(strcmp("then", s) == 0 )
         return CMDTHEN; 
@@ -77,62 +39,23 @@ int is_if_keyword(char* s){
         return CMDFI;
     else if(strcmp("else", s) == 0)
         return CMDELSE;
-    else*/
+    else
         return 0;
 }
 
-char** if_statement_exec(char** args){
-    /*char** p = args;
-    int ret;
-    if((ret = is_if_keyword(*p++)) != CMDIF){
-        fprintf(stderr, "'if' expected\n");
-        return NULL;
-    }
-    if((ret = is_if_keyword(*p++))){
-        fprintf(stderr, "unexpected token\n");
-        return NULL;
-    }
-    while(*p && !(ret = is_if_keyword(*p))){
-        p++;
-    }
-    if(*p == NULL || ret != CMDTHEN){
-        fprintf(stderr, "'then' expected\n");
+cmd_arr_t if_statement_exec(cmd_arr_t cmd_arr){
+    if(get_keyword_type(**cmd_arr) != CMDIF){
+        printf("unexpected token '%s'\n", **cmd_arr);
         return NULL;
     }
 
-    char* temp = *p;
-    *p = NULL;
-    ret = cmd_exec(args+1);
-    *p = temp;
-
-    if(ret == 0){
-        args = ++p;
-        while(*p && !(ret = is_if_keyword(*p))){
-            p++;
-        }
-        if (ret != CMDFI || *p == NULL) {
-            fprintf(stderr, "'fi' expected\n");
-            return NULL;
-        }
-        temp = *p;
-        *p = NULL;
-        cmd_exec(args);
-        *p++ = temp;
-    }else{
-        while(*p){
-            if((ret = is_if_keyword(*p)))
-            p++;
-        }
-    }
-    
-    return p;
-    */
     return NULL;
 }
 
-void free_arglist(char** args){
-    char** p = args;
-    while(*p)
-        free(*p++);
-    free(args);
+
+/*
+char* get_keyword_str(cmd_keyword_t t){    
+    static char* strs[] = {NULL, "IF", "THEN", "ELSE", "FI", "EXIT"};
+    return strs[t];
 }
+*/

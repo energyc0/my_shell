@@ -34,7 +34,9 @@ void process_cmd(){
     cmd_arr_t tok_vec = splitline_cmd(cmd_buf);
     cmd_arr_t ptr = tok_vec;
     while (*ptr) {
-        cmd_exec(*ptr++);
+        //cmd_exec(*ptr++);
+        print_cmd(*ptr++);
+        putchar('\n');
     }
     free_cmd_arr(tok_vec);
 }
