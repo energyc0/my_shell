@@ -36,14 +36,18 @@ cmd_keyword_t get_keyword_type(char* s);
 void if_statement_exec(cmd_t cmd);
 
 //if 'if' keyword found try to execute condition statement and change the program state
-void process_if_keyword(cmd_t cmd);
+int process_if_keyword(cmd_t cmd);
 
+//check validity and change the program state
 int process_then_keyword(cmd_t cmd);
 
+//check validity and change the program state
 int process_else_keyword(cmd_t cmd);
 
+//check validity and change the program state
 void process_fi_keyword(cmd_t cmd);
 
+//choose how to execute a command
 void choose_to_exec(cmd_t cmd);
 
 //print syntax error 'unexpected token' and change 'if_state' to IS_NONE
