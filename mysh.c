@@ -1,9 +1,8 @@
 #include "mysh.h"
-#include "cmd_exec.h"
-#include "token.h"
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -21,22 +20,11 @@ void setup_shell(){
     sigaction(SIGQUIT, &sgnl, NULL);
 }
 
-int get_cmd(){
-    printf(PROMPT);
+char* get_cmd(){
+    printf(PROMPT);fflush(stdin);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
-        return 0;
+        return NULL;
     }
     cmd_buf[strlen(cmd_buf)-1] = '\0';
-    return 1;
-}
-
-void process_cmd(){
-    cmd_arr_t tok_vec = splitline_cmd(cmd_buf);
-    cmd_arr_t ptr = tok_vec;
-    while (*ptr) {
-        //cmd_exec(*ptr++);
-        print_cmd(*ptr++);
-        putchar('\n');
-    }
-    free_cmd_arr(tok_vec);
+    return cmd_buf;
 }

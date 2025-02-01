@@ -2,7 +2,6 @@
 #define MYSH_H
 
 void setup_shell();
-int get_cmd();
-void process_cmd();
+char* get_cmd();
 
 #endif
