@@ -17,11 +17,11 @@
 #define CMD_ERR     1   //is error command
 static int cmd_info;
 
-//get user input and return it in buffer
+//get user input, must call free()
 char* get_cmd(){
     static char cmd_buf[BUFSIZ];
 
-    char* replace_variables(char*); //seek for variable and replace them with their values
+    char* replace_variables(char*); //seek for variable and replace them with their values, must call free()
 
     printf(PROMPT);fflush(stdin);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
@@ -71,6 +71,10 @@ cmd_type_t get_keyword_type(char* s){
         return C_ELSE;
     else if(strcmp("exit", s) == 0)
         return C_EXIT;
+    else if(strcmp("env", s) == 0)
+        return C_ENV;
+    else if(strcmp("set", s) == 0)
+        return C_SET;
     else if(is_correct_assign(s))
         return C_ASSIGN;
     return C_NONE;
@@ -143,7 +147,9 @@ void choose_to_exec(cmd_t cmd){
         case C_THEN:       if(!process_then_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   change program state and
         case C_ELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   execute a command if exist
         case C_FI:         process_fi_keyword(cmd); cmd++; break;                   //pop 'if' block                    *
-        //case C_ASSIGN:     var_table_try_add(cmd); return;
+        case C_ASSIGN:     var_table_add(*cmd, 0); cmd++; break;
+        case C_SET:        print_var_table(1); return;
+        case C_ENV:        print_var_table(0); return;
         case C_NONE:
         default: break;
     }
@@ -170,7 +176,7 @@ void print_synt_err(cmd_t cmd){
     cmd_info |= CMD_ERR;
 }
 
-//seek for variable and replace them with their values
+//seek for variable and replace them with their values, must call free()
 char* replace_variables(char* cmd_buf){
     char* p = cmd_buf;
     char* var_name_start;
@@ -199,6 +205,7 @@ char* replace_variables(char* cmd_buf){
         p = var_name_end;
     }
 
+    //allocate new string and replace all the variables with 'found_variables' array
     char* replaced_str = emalloc(new_length + 1);
     memset(replaced_str, '\0', new_length+1);
     char* insert_ptr = replaced_str;
@@ -214,6 +221,5 @@ char* replace_variables(char* cmd_buf){
     }
     strcat(insert_ptr, p);
     replaced_str[new_length] = '\0';
-    printf("%s\n", replaced_str);
     return replaced_str;
 }

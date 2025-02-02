@@ -10,7 +10,9 @@ typedef enum cmd_type_t{
     C_ELSE,
     C_FI,
     C_EXIT,
-    C_ASSIGN
+    C_ASSIGN,
+    C_ENV,
+    C_SET
 } cmd_type_t;
 
 enum if_state_t{

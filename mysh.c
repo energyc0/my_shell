@@ -17,14 +17,14 @@ void setup_shell(){
     sigaction(SIGINT, &sgnl, NULL);
     sigaction(SIGQUIT, &sgnl, NULL);
 
-    table_setup();
-    print_var_table();
+    //table_setup();
 }
 
 void run_shell(){
     char* user_input;
-    while ((user_input = get_cmd()) != 0) {
+    while ((user_input = get_cmd()) != NULL) {
         process_cmds(user_input);
+        free(user_input);
     }
 }
 
