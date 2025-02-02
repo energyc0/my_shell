@@ -14,7 +14,7 @@ int cmd_info;
 
 //execute command and return the exit code, return if_stat_result_t
 enum if_stat_result_t cmd_exec(cmd_t args){
-    if (args == NULL || (cmd_info & CMD_ERR)) {
+    if (*args == NULL || (cmd_info & CMD_ERR)) {
         return ISR_NONE;
     }
     __pid_t r = fork();
@@ -87,9 +87,8 @@ int process_else_keyword(cmd_t cmd){
 }
 
 void process_fi_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == CMDFI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK)){
+    if(get_keyword_type(cmd[0]) == CMDFI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK))
         pop_if_statement();
-    }
     else
         print_synt_err(cmd);
 }
@@ -111,24 +110,27 @@ char* get_keyword_str(cmd_keyword_t t){
 }
 */
 
-int is_in_block(){
-    return (get_current_state() == IS_NONE ||
-     (get_current_state() == IS_THEN_BLOCK && get_current_result()  == ISR_SUCCESS) ||
-     (get_current_state()  == IS_ELSE_BLOCK && get_current_result()  == ISR_FAILURE));
+int is_in_block(enum if_state_t st, enum if_stat_result_t res){
+    return (st == IS_NONE ||
+     (st == IS_THEN_BLOCK && res  == ISR_SUCCESS) ||
+     (st  == IS_ELSE_BLOCK && res  == ISR_FAILURE));
 }
 
 void choose_to_exec(cmd_t cmd){
     switch (get_keyword_type(*cmd)) {
         case CMDEXIT:       exit_shell(cmd); return;
-        case CMDIF:         if(process_if_keyword(cmd)) if_statement_exec(cmd+1); return;      //start if block        *    
-        case CMDTHEN:       if(!process_then_keyword(cmd))return; cmd++; break;  //                      *   change program state and
-        case CMDELSE:       if(!process_else_keyword(cmd))return; cmd++; break;   //                     *    execute a command if exist
+        case CMDIF:         if(process_if_keyword(cmd)) cmd++; break;;      //start if block        *    
+        case CMDTHEN:       if(!process_then_keyword(cmd)) return; cmd++; break;  //                      *   change program state and
+        case CMDELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;   //                     *    execute a command if exist
         case CMDFI:         process_fi_keyword(cmd); cmd++; break;                //out of 'if' block     *
         case CMDNONE:
         default: break;
     }
-    if(is_in_block())
-        cmd_exec(cmd);
+    if(get_current_state() == IS_WAIT_COND)
+            if_statement_exec(cmd);
+    else if(is_in_block(get_current_state(), get_current_result())) {
+            cmd_exec(cmd);
+    }
 }
 
 void process_cmds(char* args){
