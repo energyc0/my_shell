@@ -1,5 +1,7 @@
 #include "cmd_exec.h"
 #include "if_stack.h"
+#include "utils.h"
+#include "var_table.h"
 #include <limits.h>
 #include <stdio.h>
 #include <signal.h>
@@ -8,9 +10,26 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#define PROMPT ">"
+#define MAX_VARIABLE_IN_CMD 256
+
 //cmd_info flags
 #define CMD_ERR     1   //is error command
-int cmd_info;
+static int cmd_info;
+
+//get user input and return it in buffer
+char* get_cmd(){
+    static char cmd_buf[BUFSIZ];
+
+    char* replace_variables(char*); //seek for variable and replace them with their values
+
+    printf(PROMPT);fflush(stdin);
+    if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
+        return NULL;
+    }
+    cmd_buf[strlen(cmd_buf)-1] = '\0';
+    return replace_variables(cmd_buf);
+}
 
 //execute command and return the exit code, return if_stat_result_t
 enum if_stat_result_t cmd_exec(cmd_t args){
@@ -41,24 +60,25 @@ enum if_stat_result_t cmd_exec(cmd_t args){
     return r;
 }
 
-cmd_keyword_t get_keyword_type(char* s){
+cmd_type_t get_keyword_type(char* s){
     if(strcmp("if", s) == 0)
-        return CMDIF;
+        return C_IF;
     else if(strcmp("then", s) == 0 )
-        return CMDTHEN; 
+        return C_THEN; 
     else if(strcmp("fi", s)  == 0)
-        return CMDFI;
+        return C_FI;
     else if(strcmp("else", s) == 0)
-        return CMDELSE;
+        return C_ELSE;
     else if(strcmp("exit", s) == 0)
-        return CMDEXIT;
-    else
-        return 0;
+        return C_EXIT;
+    else if(is_correct_assign(s))
+        return C_ASSIGN;
+    return C_NONE;
 }
 
 //if 'if' keyword found try to execute condition statement and change the program state
 int process_if_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) != CMDIF || (get_current_state() == IS_WAIT_THEN)){
+    if(get_keyword_type(cmd[0]) != C_IF || (get_current_state() == IS_WAIT_THEN)){
         print_synt_err(cmd);
         return 0;
     }else{
@@ -71,7 +91,7 @@ int process_if_keyword(cmd_t cmd){
 }
 
 int process_then_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == CMDTHEN && get_current_result() != ISR_NONE && get_current_state() == IS_WAIT_THEN)
+    if(get_keyword_type(cmd[0]) == C_THEN && get_current_result() != ISR_NONE && get_current_state() == IS_WAIT_THEN)
         change_current_state(IS_THEN_BLOCK);
     else
         print_synt_err(cmd);
@@ -79,7 +99,7 @@ int process_then_keyword(cmd_t cmd){
 }
 
 int process_else_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == CMDELSE && get_current_result() != ISR_NONE && get_current_state() == IS_THEN_BLOCK)
+    if(get_keyword_type(cmd[0]) == C_ELSE && get_current_result() != ISR_NONE && get_current_state() == IS_THEN_BLOCK)
         change_current_state(IS_ELSE_BLOCK);
     else
         print_synt_err(cmd);
@@ -87,7 +107,7 @@ int process_else_keyword(cmd_t cmd){
 }
 
 void process_fi_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == CMDFI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK))
+    if(get_keyword_type(cmd[0]) == C_FI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK))
         pop_if_statement();
     else
         print_synt_err(cmd);
@@ -113,17 +133,18 @@ char* get_keyword_str(cmd_keyword_t t){
 int is_in_block(enum if_state_t st, enum if_stat_result_t res){
     return (st == IS_NONE ||
      (st == IS_THEN_BLOCK && res  == ISR_SUCCESS) ||
-     (st  == IS_ELSE_BLOCK && res  == ISR_FAILURE));
+     (st == IS_ELSE_BLOCK && res  == ISR_FAILURE));
 }
 
 void choose_to_exec(cmd_t cmd){
     switch (get_keyword_type(*cmd)) {
-        case CMDEXIT:       exit_shell(cmd); return;
-        case CMDIF:         if(process_if_keyword(cmd)) cmd++; break;;      //start if block        *    
-        case CMDTHEN:       if(!process_then_keyword(cmd)) return; cmd++; break;  //                      *   change program state and
-        case CMDELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;   //                     *    execute a command if exist
-        case CMDFI:         process_fi_keyword(cmd); cmd++; break;                //out of 'if' block     *
-        case CMDNONE:
+        case C_EXIT:       exit_shell(cmd); return;
+        case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
+        case C_THEN:       if(!process_then_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   change program state and
+        case C_ELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   execute a command if exist
+        case C_FI:         process_fi_keyword(cmd); cmd++; break;                   //pop 'if' block                    *
+        //case C_ASSIGN:     var_table_try_add(cmd); return;
+        case C_NONE:
         default: break;
     }
     if(get_current_state() == IS_WAIT_COND)
@@ -147,4 +168,52 @@ void print_synt_err(cmd_t cmd){
     printf("unexpected token '%s'\n", cmd[0]);
     clear_if_stack();
     cmd_info |= CMD_ERR;
+}
+
+//seek for variable and replace them with their values
+char* replace_variables(char* cmd_buf){
+    char* p = cmd_buf;
+    char* var_name_start;
+    char* found_variables[MAX_VARIABLE_IN_CMD];
+    int var_count = 0;
+    int new_length = strlen(cmd_buf);
+
+    //search variables in buffer and add them to the 'found_variables' array, calculate new length
+    while ((var_name_start = strchr(p, '$')) != NULL) {
+        if(*++var_name_start == '\0')
+            break;
+        
+        if(var_count >= MAX_VARIABLE_IN_CMD){
+            fprintf(stderr, "variables in command limit exceeded!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        char* var_name_end;
+        for (var_name_end = var_name_start; IS_VAR_SYM(*var_name_end); var_name_end++);
+
+        char temp = *var_name_end;
+        *var_name_end = '\0';
+        found_variables[var_count] = var_table_find(var_name_start);
+        new_length += (strlen(found_variables[var_count++]) - (var_name_end - var_name_start)) - 1;
+        *var_name_end = temp;
+        p = var_name_end;
+    }
+
+    char* replaced_str = emalloc(new_length + 1);
+    memset(replaced_str, '\0', new_length+1);
+    char* insert_ptr = replaced_str;
+    p = cmd_buf;
+    int i = 0;
+    while ((var_name_start = strchr(p, '$')) != NULL) {
+        insert_ptr = strncat(insert_ptr, p, var_name_start-p);
+        if(*++var_name_start == '\0')
+            break;
+        for (; IS_VAR_SYM(*var_name_start); var_name_start++);
+        strcat(insert_ptr, found_variables[i++]);
+        p = var_name_start;
+    }
+    strcat(insert_ptr, p);
+    replaced_str[new_length] = '\0';
+    printf("%s\n", replaced_str);
+    return replaced_str;
 }

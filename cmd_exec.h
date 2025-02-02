@@ -3,14 +3,15 @@
 
 #include "token.h"
 
-typedef enum cmd_keyword_t{
-    CMDNONE,
-    CMDIF,
-    CMDTHEN,
-    CMDELSE,
-    CMDFI,
-    CMDEXIT
-} cmd_keyword_t;
+typedef enum cmd_type_t{
+    C_NONE,
+    C_IF,
+    C_THEN,
+    C_ELSE,
+    C_FI,
+    C_EXIT,
+    C_ASSIGN
+} cmd_type_t;
 
 enum if_state_t{
     IS_NONE = 0,                //out of 'if' block
@@ -29,8 +30,11 @@ enum if_stat_result_t{
 //parse user input and execute commands
 void process_cmds(char *args);
 
+//get user input and return it in buffer
+char* get_cmd();
+
 //return keyword type of a string
-cmd_keyword_t get_keyword_type(char* s);
+cmd_type_t get_cmd_type(char* s);
 
 //execute if statement and change the program state
 void if_statement_exec(cmd_t cmd);

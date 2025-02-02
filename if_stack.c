@@ -4,8 +4,8 @@
 #include <sys/ucontext.h>
 
 #define STSZ 256
-struct shell_state if_stack[STSZ];
-int st_p = -1;
+static struct shell_state if_stack[STSZ];
+static int st_p = -1;
 
 enum if_state_t get_current_state(){
     if (st_p >= 0) 
