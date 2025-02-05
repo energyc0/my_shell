@@ -3,10 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_VARIABLES_COUNT 256
-
-#define GET_MAX_INT(a,b)(((a) > (b)) ? (a) : (b))
-
 struct table_node{
     struct table_node* left;
     struct table_node* right;
@@ -21,7 +17,7 @@ extern char** environ;
 
 //add entry to the table tree, return root; 
 //s_len must be the length of the variable name and s must be "var_name=value"
-static struct table_node* add_entry(char* s, int s_len, int is_global, struct table_node* node);
+static struct table_node* add_entry(struct table_node* node, struct table_node* new_node);
 //allocate struct table_node
 static struct table_node* mk_table_node(char* s, int is_global);
 //print nodes recursively
@@ -30,14 +26,20 @@ static void print_node_rec(const struct table_node* node,int is_local);
 static int count_global_vars(const struct table_node* node);
 //push global vars from node
 static int push_global_vars(int vars_count, char** buf, struct table_node* node);
-
+//free node 
 static void free_table_node(struct table_node* node);
+//free node recursively
+static void free_table_node_rec(struct table_node* root);
 //return variable of the form "var=value" or NULL if this variable doesn't exist
 static struct table_node* var_table_lookup(char* name);
-
+//return a node with the given name
 static struct table_node* lookup_rec(char* name, int name_len, struct table_node* node);
-//free node's string and change other attributes
-static void update_entry(char* s, struct table_node* node);
+//free node's string and copy other attributes
+static void update_entry(struct table_node* node,char* s, int is_global);
+//delete a node, return root
+static struct table_node* delete_node(struct table_node* root, char* s);
+//find minimum node from the given root
+static struct table_node* find_min_node(struct table_node* root);
 
 //return 1 if string is a correct assign expression, 0 otherwise
 int is_correct_assign(char*s){
@@ -59,7 +61,8 @@ int is_correct_assign(char*s){
 void table_setup(){
     char** p = environ;
     while (*p) {
-        var_table_root = add_entry(*p,strchr(*p, '=') - *p,1, var_table_root);
+        struct table_node* new_node = mk_table_node(*p, 1);
+        var_table_root = add_entry(var_table_root, new_node);
         p++;
     }
 }
@@ -79,17 +82,18 @@ void print_var_table(int is_local){
     print_node_rec(var_table_root, is_local);
 }
 //add entry to the table tree, return root
-static struct table_node* add_entry(char* s, int s_len,int is_global,  struct table_node* node){
+static struct table_node* add_entry(struct table_node* node, struct table_node* new_node){
     if(!node){
-        return mk_table_node(s, is_global);
+        return new_node;
     }
     int ret;
-    if((ret = strncmp(node->s,s, s_len)) == 0){
-        update_entry(s, node);
-    }else if(ret > 0){
-        node->left = add_entry(s, s_len,is_global, node->left);
+    if((ret = strncmp(node->s,new_node->s, new_node->var_name_len)) == 0){
+        update_entry(node, new_node->s, new_node->is_global);
+        free_table_node_rec(new_node); //THIS IS NOT RIGHT
+    }else if(ret < 0){
+        node->left = add_entry(node->left, new_node);
     }else{
-        node->right = add_entry(s, s_len,is_global, node->right);
+        node->right = add_entry(node->right, new_node);
     }
     return node;
 }
@@ -135,14 +139,20 @@ static int push_global_vars(int vars_count, char** buf, struct table_node* node)
 
 //clean the var_table
 void table_cleanup(){
-    free_table_node(var_table_root);
+    free_table_node_rec(var_table_root);
+}
+static void free_table_node_rec(struct table_node* node){
+    if(node){
+        free(node->s);
+        free_table_node(node->left);
+        free_table_node(node->right);
+        free(node);
+    }
 }
 
 static void free_table_node(struct table_node* node){
     if(node){
         free(node->s);
-        free_table_node(node->left);
-        free_table_node(node->right);
         free(node);
     }
 }
@@ -154,6 +164,7 @@ char* var_table_find(char* name){
         char temp_buf[strlen(name) + 2];
         sprintf(temp_buf, "%s=", name);
         p = mk_table_node(temp_buf, 0);
+        var_table_root = add_entry(var_table_root, p);
     }
     return p->s + p->var_name_len + 1;
 }
@@ -163,16 +174,22 @@ static struct table_node* var_table_lookup(char* name){
 }
 
 //add a variable in the var_table or update existing
-void var_table_add(char* name_val, int is_global){
-    var_table_root = add_entry(name_val, strchr(name_val, '=') - name_val, is_global, var_table_root);
+void set_variable(char* name_val, int is_global){
+    struct table_node* new_node = mk_table_node(name_val, is_global);
+    var_table_root = add_entry(var_table_root, new_node);
 }
 
+//delete a variable from the var_table
+void unset_variable(char* name){
+    var_table_root = delete_node(var_table_root, name);
+}
+//return a node with the given name
 static struct table_node* lookup_rec(char* name, int name_len, struct table_node* node){
     if (node) {
         int ret;
         if((ret = strncmp(node->s, name, name_len)) == 0)
             return node;
-        else if(ret > 0)
+        else if(ret < 0)
             return lookup_rec(name,name_len, node->left);
         else
             return lookup_rec(name,name_len, node->right);
@@ -181,9 +198,48 @@ static struct table_node* lookup_rec(char* name, int name_len, struct table_node
     }
 }
 
-//free node's string and change other attributes
-static void update_entry(char* s, struct table_node* node){
+//free node's string and copy other attributes
+static void update_entry(struct table_node* node,char* s, int is_global){
     free(node->s);
     node->s = newstr(s);
     node->var_name_len = strchr(s, '=')- s;
+    node->is_global = is_global;
+}
+
+//delete a node, return root
+static struct table_node* delete_node(struct table_node* root, char* s){
+    if(root){
+        int ret = strncmp(root->s, s, root->var_name_len);
+        if(ret > 0){
+            root->left = delete_node(root->left, s);
+        }else if(ret < 0){
+            root->right = delete_node(root->right, s);
+        }else{
+            struct table_node* temp;
+            if(root->left == NULL){
+                temp = root->right;
+                free_table_node(root);
+                root = temp;
+            }else if(root->right == NULL){
+                temp = root->left;
+                free_table_node(root);
+                root = temp;
+            }else{
+                temp = find_min_node(root->right);
+                update_entry(root, temp->s, temp->is_global);
+                root->right = delete_node(root->right, temp->s);
+            }
+        }
+    }
+    return root;
+}
+
+//find minimum node from the given root
+static struct table_node* find_min_node(struct table_node* root){
+    if(root){
+        while (root->left) {
+            root = root->left;
+        }
+    }
+    return root;
 }

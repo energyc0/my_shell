@@ -13,6 +13,9 @@
 #define PROMPT ">"
 #define MAX_VARIABLE_IN_CMD 256
 
+//delete variables from the table
+static void unset_table_vars(cmd_t cmd);
+
 //cmd_info flags
 #define CMD_ERR     1   //is error command
 static int cmd_info;
@@ -75,6 +78,8 @@ cmd_type_t get_keyword_type(char* s){
         return C_ENV;
     else if(strcmp("set", s) == 0)
         return C_SET;
+    else if(strcmp("unset", s) == 0)
+        return C_UNSET;
     else if(is_correct_assign(s))
         return C_ASSIGN;
     return C_NONE;
@@ -134,7 +139,7 @@ char* get_keyword_str(cmd_keyword_t t){
 }
 */
 
-int is_in_block(enum if_state_t st, enum if_stat_result_t res){
+static int is_in_block(enum if_state_t st, enum if_stat_result_t res){
     return (st == IS_NONE ||
      (st == IS_THEN_BLOCK && res  == ISR_SUCCESS) ||
      (st == IS_ELSE_BLOCK && res  == ISR_FAILURE));
@@ -147,8 +152,9 @@ void choose_to_exec(cmd_t cmd){
         case C_THEN:       if(!process_then_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   change program state and
         case C_ELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   execute a command if exist
         case C_FI:         process_fi_keyword(cmd); cmd++; break;                   //pop 'if' block                    *
-        case C_ASSIGN:     var_table_add(*cmd, 0); cmd++; break;
+        case C_ASSIGN:     set_variable(*cmd, 0); cmd++; break;
         case C_SET:        print_var_table(1); return;
+        case C_UNSET:      unset_table_vars(cmd); return;
         case C_ENV:        print_var_table(0); return;
         case C_NONE:
         default: break;
@@ -222,4 +228,10 @@ char* replace_variables(char* cmd_buf){
     strcat(insert_ptr, p);
     replaced_str[new_length] = '\0';
     return replaced_str;
+}
+
+//delete variables from the table
+static void unset_table_vars(cmd_t cmd){
+    while(*++cmd != NULL)
+        unset_variable(*cmd);
 }
