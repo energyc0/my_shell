@@ -21,6 +21,8 @@ char* var_table_find(char* name);
 void set_variable(char* name_val, int is_global);
 //delete a variable from the var_table
 void unset_variable(char* name);
+//make variable global
+void export_variable(char* name);
 
 //clean the var_table
 void table_cleanup();

@@ -13,7 +13,8 @@ typedef enum cmd_type_t{
     C_ASSIGN,
     C_ENV,
     C_SET,
-    C_UNSET
+    C_UNSET,
+    C_EXPORT
 } cmd_type_t;
 
 enum if_state_t{

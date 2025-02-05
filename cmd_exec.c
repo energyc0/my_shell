@@ -1,5 +1,6 @@
 #include "cmd_exec.h"
 #include "if_stack.h"
+#include "token.h"
 #include "utils.h"
 #include "var_table.h"
 #include <limits.h>
@@ -15,6 +16,8 @@
 
 //delete variables from the table
 static void unset_table_vars(cmd_t cmd);
+//make variables from the table global
+static void export_table_vars(cmd_t cmd);
 
 //cmd_info flags
 #define CMD_ERR     1   //is error command
@@ -80,6 +83,8 @@ cmd_type_t get_keyword_type(char* s){
         return C_SET;
     else if(strcmp("unset", s) == 0)
         return C_UNSET;
+    else if(strcmp("export", s) == 0)
+        return C_EXPORT;
     else if(is_correct_assign(s))
         return C_ASSIGN;
     return C_NONE;
@@ -156,6 +161,7 @@ void choose_to_exec(cmd_t cmd){
         case C_SET:        print_var_table(1); return;
         case C_UNSET:      unset_table_vars(cmd); return;
         case C_ENV:        print_var_table(0); return;
+        case C_EXPORT:     export_table_vars(cmd); return;
         case C_NONE:
         default: break;
     }
@@ -234,4 +240,10 @@ char* replace_variables(char* cmd_buf){
 static void unset_table_vars(cmd_t cmd){
     while(*++cmd != NULL)
         unset_variable(*cmd);
+}
+
+//make variables from the table global
+static void export_table_vars(cmd_t cmd){
+    while(*++cmd != NULL)
+        export_variable(*cmd);
 }

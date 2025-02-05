@@ -243,3 +243,15 @@ static struct table_node* find_min_node(struct table_node* root){
     }
     return root;
 }
+
+//make variable global
+void export_variable(char* name){
+    struct table_node* p = var_table_lookup(name);
+    if(p == NULL){
+        char buf[strlen(name)+2];
+        sprintf(buf, "%s=", name);
+        var_table_root = add_entry(var_table_root, mk_table_node(buf, 1));
+    }else{
+        p->is_global = 1;
+    }
+}
