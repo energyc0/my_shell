@@ -32,39 +32,8 @@ enum if_stat_result_t{
 };
 
 //parse user input and execute commands
-void process_cmds(char *args);
+void process_shell_cmds(char *args);
 
 //get user input and return it in buffer
-char* get_cmd();
-
-//return keyword type of a string
-cmd_type_t get_cmd_type(char* s);
-
-//execute if statement and change the program state
-void if_statement_exec(cmd_t cmd);
-
-//if 'if' keyword found try to execute condition statement and change the program state
-int process_if_keyword(cmd_t cmd);
-
-//check validity and change the program state
-int process_then_keyword(cmd_t cmd);
-
-//check validity and change the program state
-int process_else_keyword(cmd_t cmd);
-
-//check validity and change the program state
-void process_fi_keyword(cmd_t cmd);
-
-//choose how to execute a command
-void choose_to_exec(cmd_t cmd);
-
-//print syntax error 'unexpected token' and change 'if_state' to IS_NONE
-void print_synt_err(cmd_t cmd);
-
-//execute command and return the exit code
-enum if_stat_result_t cmd_exec(cmd_t args);
-
-//exit shell and parse a return code
-void exit_shell(cmd_t args);
-
+char* get_shell_cmd();
 #endif

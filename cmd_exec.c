@@ -14,8 +14,42 @@
 #define PROMPT ">"
 #define MAX_VARIABLE_IN_CMD 256
 
+//execute if statement and change the program state
+static void if_statement_exec(cmd_t cmd);
+
+//if 'if' keyword found try to execute condition statement and change the program state
+static int process_if_keyword(cmd_t cmd);
+
+//check validity and change the program state
+static int process_then_keyword(cmd_t cmd);
+
+//check validity and change the program state
+static int process_else_keyword(cmd_t cmd);
+
+//check validity and change the program state
+static void process_fi_keyword(cmd_t cmd);
+
+//choose how to execute a command
+static void choose_to_exec(cmd_t cmd);
+
+//seek for variable and replace them with their values, must call free()
+static char* replace_variables(char*);
+
+//print syntax error 'unexpected token' and change 'if_state' to IS_NONE
+static void print_synt_err(cmd_t cmd);
+
+//execute command and return the exit code
+static enum if_stat_result_t cmd_exec(cmd_t args);
+
+//return keyword type of a string
+static cmd_type_t get_cmd_type(char* s);
+
+//exit shell and parse a return code
+static void exit_shell(cmd_t args);
+
 //delete variables from the table
 static void unset_table_vars(cmd_t cmd);
+
 //make variables from the table global
 static void export_table_vars(cmd_t cmd);
 
@@ -24,10 +58,8 @@ static void export_table_vars(cmd_t cmd);
 static int cmd_info;
 
 //get user input, must call free()
-char* get_cmd(){
+char* get_shell_cmd(){
     static char cmd_buf[BUFSIZ];
-
-    char* replace_variables(char*); //seek for variable and replace them with their values, must call free()
 
     printf(PROMPT);fflush(stdin);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
@@ -38,7 +70,7 @@ char* get_cmd(){
 }
 
 //execute command and return the exit code, return if_stat_result_t
-enum if_stat_result_t cmd_exec(cmd_t args){
+static enum if_stat_result_t cmd_exec(cmd_t args){
     if (*args == NULL || (cmd_info & CMD_ERR)) {
         return ISR_NONE;
     }
@@ -66,7 +98,7 @@ enum if_stat_result_t cmd_exec(cmd_t args){
     return r;
 }
 
-cmd_type_t get_keyword_type(char* s){
+static cmd_type_t get_keyword_type(char* s){
     if(strcmp("if", s) == 0)
         return C_IF;
     else if(strcmp("then", s) == 0 )
@@ -91,7 +123,7 @@ cmd_type_t get_keyword_type(char* s){
 }
 
 //if 'if' keyword found try to execute condition statement and change the program state
-int process_if_keyword(cmd_t cmd){
+static int process_if_keyword(cmd_t cmd){
     if(get_keyword_type(cmd[0]) != C_IF || (get_current_state() == IS_WAIT_THEN)){
         print_synt_err(cmd);
         return 0;
@@ -104,7 +136,7 @@ int process_if_keyword(cmd_t cmd){
     }
 }
 
-int process_then_keyword(cmd_t cmd){
+static int process_then_keyword(cmd_t cmd){
     if(get_keyword_type(cmd[0]) == C_THEN && get_current_result() != ISR_NONE && get_current_state() == IS_WAIT_THEN)
         change_current_state(IS_THEN_BLOCK);
     else
@@ -112,7 +144,7 @@ int process_then_keyword(cmd_t cmd){
     return get_current_result() == ISR_SUCCESS;
 }
 
-int process_else_keyword(cmd_t cmd){
+static int process_else_keyword(cmd_t cmd){
     if(get_keyword_type(cmd[0]) == C_ELSE && get_current_result() != ISR_NONE && get_current_state() == IS_THEN_BLOCK)
         change_current_state(IS_ELSE_BLOCK);
     else
@@ -120,7 +152,7 @@ int process_else_keyword(cmd_t cmd){
     return get_current_result() == ISR_FAILURE;
 }
 
-void process_fi_keyword(cmd_t cmd){
+static void process_fi_keyword(cmd_t cmd){
     if(get_keyword_type(cmd[0]) == C_FI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK))
         pop_if_statement();
     else
@@ -128,21 +160,15 @@ void process_fi_keyword(cmd_t cmd){
 }
 
 //execute if statement and change the program state
-void if_statement_exec(cmd_t cmd){
+static void if_statement_exec(cmd_t cmd){
     change_current_result(cmd_exec(cmd));
     change_current_state(get_current_result() == ISR_NONE ? IS_WAIT_COND : IS_WAIT_THEN);
 }
 
 //exit shell and parse a return code
-void exit_shell(cmd_t args){
+static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
-/*
-char* get_keyword_str(cmd_keyword_t t){    
-    static char* strs[] = {NULL, "IF", "THEN", "ELSE", "FI", "EXIT"};
-    return strs[t];
-}
-*/
 
 static int is_in_block(enum if_state_t st, enum if_stat_result_t res){
     return (st == IS_NONE ||
@@ -150,7 +176,7 @@ static int is_in_block(enum if_state_t st, enum if_stat_result_t res){
      (st == IS_ELSE_BLOCK && res  == ISR_FAILURE));
 }
 
-void choose_to_exec(cmd_t cmd){
+static void choose_to_exec(cmd_t cmd){
     switch (get_keyword_type(*cmd)) {
         case C_EXIT:       exit_shell(cmd); return;
         case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
@@ -172,7 +198,7 @@ void choose_to_exec(cmd_t cmd){
     }
 }
 
-void process_cmds(char* args){
+void process_shell_cmds(char* args){
     cmd_arr_t tok_vec = splitline_cmd(args);
     for (cmd_arr_t ptr = tok_vec;*ptr; ptr++) {
         choose_to_exec(*ptr);
@@ -182,14 +208,14 @@ void process_cmds(char* args){
 }
 
 //print syntax error 'unexpected token', change 'if_state' to IS_NONE and set CMD_ERR flag
-void print_synt_err(cmd_t cmd){
+static void print_synt_err(cmd_t cmd){
     printf("unexpected token '%s'\n", cmd[0]);
     clear_if_stack();
     cmd_info |= CMD_ERR;
 }
 
 //seek for variable and replace them with their values, must call free()
-char* replace_variables(char* cmd_buf){
+static char* replace_variables(char* cmd_buf){
     char* p = cmd_buf;
     char* var_name_start;
     char* found_variables[MAX_VARIABLE_IN_CMD];

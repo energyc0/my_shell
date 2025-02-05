@@ -7,9 +7,6 @@ typedef char* token_t;
 typedef token_t* cmd_t;
 typedef cmd_t* cmd_arr_t;
 
-//just free()
-#define FREE_TOKEN(p) {free(p);}
-
 //allocate new token, must call free_token()
 token_t mktoken(char* s);
 

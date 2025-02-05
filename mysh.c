@@ -22,8 +22,8 @@ void setup_shell(){
 
 void run_shell(){
     char* user_input;
-    while ((user_input = get_cmd()) != NULL) {
-        process_cmds(user_input);
+    while ((user_input = get_shell_cmd()) != NULL) {
+        process_shell_cmds(user_input);
         free(user_input);
     }
 }

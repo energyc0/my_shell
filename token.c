@@ -7,6 +7,9 @@
 
 #define MAX_COMMANDS_PER_LINE 64
 
+//just free()
+#define FREE_TOKEN(p) {free(p);}
+
 //allocate command array, must call free()
 cmd_arr_t splitline_cmd(char* arg_buf){
     char* prev = arg_buf;
