@@ -14,6 +14,8 @@
 #define PROMPT ">"
 #define MAX_VARIABLE_IN_CMD 256
 
+extern char** environ;
+
 //execute if statement and change the program state
 static void if_statement_exec(cmd_t cmd);
 
@@ -53,13 +55,16 @@ static void unset_table_vars(cmd_t cmd);
 //make variables from the table global
 static void export_table_vars(cmd_t cmd);
 
+//read a variable from the user input
+static void read_variable(cmd_t cmd);
+
 //cmd_info flags
 #define CMD_ERR     1   //is error command
 static int cmd_info;
+static char cmd_buf[BUFSIZ];
 
 //get user input, must call free()
 char* get_shell_cmd(){
-    static char cmd_buf[BUFSIZ];
 
     printf(PROMPT);fflush(stdin);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
@@ -77,8 +82,9 @@ static enum if_stat_result_t cmd_exec(cmd_t args){
     __pid_t r = fork();
     if(r == -1){
         perror("fork()");
-        r = ISR_NONE;
-    }else if(r == 0){
+        return ISR_NONE;
+    }
+    if(r == 0){
         struct sigaction sgnl;
         memset(&sgnl, 0, sizeof sgnl);
         sgnl.sa_handler = SIG_DFL;
@@ -86,6 +92,7 @@ static enum if_stat_result_t cmd_exec(cmd_t args){
         sigaction(SIGINT, &sgnl, NULL);
         sigaction(SIGQUIT, &sgnl, NULL);
 
+        environ = get_env_vars();
         if(execvp(args[0], args)){
             perror(args[0]);
             exit(EXIT_FAILURE);
@@ -95,6 +102,7 @@ static enum if_stat_result_t cmd_exec(cmd_t args){
         wait(&stat_loc);
         r = WEXITSTATUS(stat_loc) == 0 ? ISR_SUCCESS : ISR_FAILURE;
     }
+
     return r;
 }
 
@@ -117,6 +125,8 @@ static cmd_type_t get_keyword_type(char* s){
         return C_UNSET;
     else if(strcmp("export", s) == 0)
         return C_EXPORT;
+    else if(strcmp("read", s) == 0)
+        return C_READ;
     else if(is_correct_assign(s))
         return C_ASSIGN;
     return C_NONE;
@@ -188,6 +198,7 @@ static void choose_to_exec(cmd_t cmd){
         case C_UNSET:      unset_table_vars(cmd); return;
         case C_ENV:        print_var_table(0); return;
         case C_EXPORT:     export_table_vars(cmd); return;
+        case C_READ:       read_variable(cmd); return;
         case C_NONE:
         default: break;
     }
@@ -272,4 +283,17 @@ static void unset_table_vars(cmd_t cmd){
 static void export_table_vars(cmd_t cmd){
     while(*++cmd != NULL)
         export_variable(*cmd);
+}
+
+static void read_variable(cmd_t cmd){
+    if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
+        perror("fgets()");
+        exit(EXIT_FAILURE);
+    }
+    int len = strlen(cmd_buf);
+
+    cmd_buf[len-1]='\0';
+    char temp[len + strlen(cmd[1]) + 2];
+    sprintf(temp, "%s=%s", cmd[1], cmd_buf);
+    set_variable(temp, 0);
 }

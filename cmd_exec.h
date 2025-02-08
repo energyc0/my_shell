@@ -14,7 +14,8 @@ typedef enum cmd_type_t{
     C_ENV,
     C_SET,
     C_UNSET,
-    C_EXPORT
+    C_EXPORT,
+    C_READ
 } cmd_type_t;
 
 enum if_state_t{

@@ -17,7 +17,7 @@ void setup_shell(){
     sigaction(SIGINT, &sgnl, NULL);
     sigaction(SIGQUIT, &sgnl, NULL);
 
-    //table_setup();
+    table_setup();
 }
 
 void run_shell(){

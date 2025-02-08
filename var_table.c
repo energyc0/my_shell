@@ -74,7 +74,7 @@ char** get_env_vars(){
     env_vars = emalloc((global_count + 1)* sizeof(char*) );
 
     push_global_vars(0, env_vars, var_table_root);
-
+    env_vars[global_count] = NULL;
     return env_vars;
 }
 //print all global variables in var_table, if is_local then print all the variables 
@@ -90,7 +90,7 @@ static struct table_node* add_entry(struct table_node* node, struct table_node* 
     if((ret = strncmp(node->s,new_node->s, new_node->var_name_len)) == 0){
         update_entry(node, new_node->s, new_node->is_global);
         free_table_node_rec(new_node); //THIS IS NOT RIGHT
-    }else if(ret < 0){
+    }else if(ret > 0){
         node->left = add_entry(node->left, new_node);
     }else{
         node->right = add_entry(node->right, new_node);
@@ -189,7 +189,7 @@ static struct table_node* lookup_rec(char* name, int name_len, struct table_node
         int ret;
         if((ret = strncmp(node->s, name, name_len)) == 0)
             return node;
-        else if(ret < 0)
+        else if(ret > 0)
             return lookup_rec(name,name_len, node->left);
         else
             return lookup_rec(name,name_len, node->right);
