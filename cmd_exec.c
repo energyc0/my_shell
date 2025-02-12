@@ -3,10 +3,13 @@
 #include "token.h"
 #include "utils.h"
 #include "var_table.h"
+#include <complex.h>
 #include <limits.h>
 #include <stdio.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -58,10 +61,15 @@ static void export_table_vars(cmd_t cmd);
 //read a variable from the user input
 static void read_variable(cmd_t cmd);
 
+//SIGCHLD handler
+static void sigchld_handler(int code);
+
 //cmd_info flags
 #define CMD_ERR     1   //is error command
 static int cmd_info;
 static char cmd_buf[BUFSIZ];
+
+static int children_count = 0;
 
 //get user input, must call free()
 char* get_shell_cmd(){
@@ -76,9 +84,23 @@ char* get_shell_cmd(){
 
 //execute command and return the exit code, return IS_SUCCEEDED or IS_FAILED
 static enum if_state_t cmd_exec(cmd_t args){
-    if (*args == NULL || (cmd_info & CMD_ERR)) {
+    if (args[0] == NULL || (cmd_info & CMD_ERR)) {
         return IS_FAILED;
     }
+
+    int background_mode;
+    cmd_t p = args;
+    while (p[1]) {
+        p++;
+    }
+    if(strcmp("&", p[0]) == 0){
+        background_mode = 1;
+        free(p[0]);
+        p[0] = NULL;
+    }else{
+        background_mode = 0;
+    }
+
     __pid_t r = fork();
     if(r == -1){
         perror("fork()");
@@ -91,16 +113,23 @@ static enum if_state_t cmd_exec(cmd_t args){
         
         sigaction(SIGINT, &sgnl, NULL);
         sigaction(SIGQUIT, &sgnl, NULL);
-
+        
         environ = get_env_vars();
         if(execvp(args[0], args)){
             perror(args[0]);
             exit(EXIT_FAILURE);
         }
     }else{
-        int stat_loc;
-        wait(&stat_loc);
-        r = WEXITSTATUS(stat_loc) == 0 ? IS_SUCCEEDED : IS_FAILED;
+        children_count++;
+        //wait for execution or not
+        if(!background_mode || get_current_state() == IS_WAIT_COND){
+            int stat_loc;
+            wait(&stat_loc);
+            r = WEXITSTATUS(stat_loc) == 0 ? IS_SUCCEEDED : IS_FAILED;
+        }else{
+            printf("[%d] %d\n", children_count, r);
+            r = IS_SUCCEEDED;
+        }
     }
 
     return r;
@@ -178,13 +207,7 @@ static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
 
-/*
-static int is_in_block(enum if_state_t st, enum if_stat_result_t res){
-    return (st == IS_NONE ||
-     (st == IS_THEN_BLOCK && res  == ISR_SUCCESS) ||
-     (st == IS_ELSE_BLOCK && res  == ISR_FAILURE));
-}
-*/
+// /media/energyc0/sdb2/programming/repos/unix_programming/chapter-8/waitdemo2.out 3
 static int is_skip_block(){
     enum if_state_t st = get_current_state();
     if(st == IS_SKIPPING_THEN || st == IS_SKIPPING_ELSE)
@@ -304,4 +327,24 @@ static void read_variable(cmd_t cmd){
     char temp[len + strlen(cmd[1]) + 2];
     sprintf(temp, "%s=%s", cmd[1], cmd_buf);
     set_variable(temp, 0);
+}
+
+static void sigchld_handler(int code){
+    int p_status;
+    pid_t id;
+    while ((id = waitpid(-1, &p_status, WNOHANG)) > 0) {
+        printf("%d exited with code %d.\n", id, WEXITSTATUS(p_status));
+        children_count--;
+    }
+}
+
+void setup_child_sighandler(){
+    struct sigaction sgnl;
+    memset(&sgnl, 0, sizeof sgnl);
+    sgnl.sa_handler = sigchld_handler;
+    sgnl.sa_flags = SA_RESTART;
+    if(sigaction(SIGCHLD, &sgnl, NULL)){
+        perror("sigaction");
+        exit(EXIT_FAILURE);    
+    }
 }

@@ -29,13 +29,9 @@ enum if_state_t{
     IS_SKIPPING_ELSE            //skipping 'then' block until 'else' or 'fi'    
 };
 
-/*
-enum if_stat_result_t{
-    ISR_NONE = 0,
-    ISR_FAILURE,
-    ISR_SUCCESS
-};
-*/
+
+void setup_child_sighandler();
+
 //parse user input and execute commands
 void process_shell_cmds(char *args);
 

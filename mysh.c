@@ -17,6 +17,7 @@ void setup_shell(){
     sigaction(SIGINT, &sgnl, NULL);
     sigaction(SIGQUIT, &sgnl, NULL);
 
+    setup_child_sighandler();
     table_setup();
 }
 
