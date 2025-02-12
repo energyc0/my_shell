@@ -23,10 +23,10 @@ static void if_statement_exec(cmd_t cmd);
 static int process_if_keyword(cmd_t cmd);
 
 //check validity and change the program state
-static int process_then_keyword(cmd_t cmd);
+static void process_then_keyword(cmd_t cmd);
 
 //check validity and change the program state
-static int process_else_keyword(cmd_t cmd);
+static void process_else_keyword(cmd_t cmd);
 
 //check validity and change the program state
 static void process_fi_keyword(cmd_t cmd);
@@ -41,7 +41,7 @@ static char* replace_variables(char*);
 static void print_synt_err(cmd_t cmd);
 
 //execute command and return the exit code
-static enum if_stat_result_t cmd_exec(cmd_t args);
+static enum if_state_t cmd_exec(cmd_t args);
 
 //return keyword type of a string
 static cmd_type_t get_cmd_type(char* s);
@@ -74,15 +74,15 @@ char* get_shell_cmd(){
     return replace_variables(cmd_buf);
 }
 
-//execute command and return the exit code, return if_stat_result_t
-static enum if_stat_result_t cmd_exec(cmd_t args){
+//execute command and return the exit code, return IS_SUCCEEDED or IS_FAILED
+static enum if_state_t cmd_exec(cmd_t args){
     if (*args == NULL || (cmd_info & CMD_ERR)) {
-        return ISR_NONE;
+        return IS_FAILED;
     }
     __pid_t r = fork();
     if(r == -1){
         perror("fork()");
-        return ISR_NONE;
+        return IS_FAILED;
     }
     if(r == 0){
         struct sigaction sgnl;
@@ -100,7 +100,7 @@ static enum if_stat_result_t cmd_exec(cmd_t args){
     }else{
         int stat_loc;
         wait(&stat_loc);
-        r = WEXITSTATUS(stat_loc) == 0 ? ISR_SUCCESS : ISR_FAILURE;
+        r = WEXITSTATUS(stat_loc) == 0 ? IS_SUCCEEDED : IS_FAILED;
     }
 
     return r;
@@ -134,36 +134,35 @@ static cmd_type_t get_keyword_type(char* s){
 
 //if 'if' keyword found try to execute condition statement and change the program state
 static int process_if_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) != C_IF || (get_current_state() == IS_WAIT_THEN)){
+    enum if_state_t st = get_current_state();
+    if(get_keyword_type(cmd[0]) != C_IF || st == IS_WAIT_COND || st == IS_SUCCEEDED || st == IS_FAILED){
         print_synt_err(cmd);
         return 0;
     }else{
-        struct shell_state sh_st;
-        sh_st.if_state = IS_WAIT_COND;
-        sh_st.if_res = ISR_NONE;
-        push_if_statement(&sh_st);
+        push_if_statement(IS_WAIT_COND);
         return 1;
     }
 }
 
-static int process_then_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == C_THEN && get_current_result() != ISR_NONE && get_current_state() == IS_WAIT_THEN)
-        change_current_state(IS_THEN_BLOCK);
+static void process_then_keyword(cmd_t cmd){
+    enum if_state_t st = get_current_state();
+    if(get_keyword_type(cmd[0]) == C_THEN && (st == IS_FAILED || st == IS_SUCCEEDED))
+        change_current_state(st == IS_SUCCEEDED ? IS_DOING_THEN : IS_SKIPPING_THEN);
     else
         print_synt_err(cmd);
-    return get_current_result() == ISR_SUCCESS;
 }
 
-static int process_else_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == C_ELSE && get_current_result() != ISR_NONE && get_current_state() == IS_THEN_BLOCK)
-        change_current_state(IS_ELSE_BLOCK);
+static void process_else_keyword(cmd_t cmd){
+    enum if_state_t st = get_current_state();
+    if(get_keyword_type(cmd[0]) == C_ELSE && (st == IS_SKIPPING_THEN || st == IS_DOING_THEN))
+        change_current_state(st == IS_SKIPPING_THEN ? IS_DOING_ELSE : IS_SKIPPING_ELSE);
     else
         print_synt_err(cmd);
-    return get_current_result() == ISR_FAILURE;
 }
 
 static void process_fi_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) == C_FI && get_current_result() != ISR_NONE && (get_current_state() == IS_THEN_BLOCK || get_current_state() == IS_ELSE_BLOCK))
+    enum if_state_t st = get_current_state();
+    if(get_keyword_type(cmd[0]) == C_FI && (IS_SKIPPING_ELSE >= st && st >= IS_DOING_THEN))
         pop_if_statement();
     else
         print_synt_err(cmd);
@@ -171,8 +170,7 @@ static void process_fi_keyword(cmd_t cmd){
 
 //execute if statement and change the program state
 static void if_statement_exec(cmd_t cmd){
-    change_current_result(cmd_exec(cmd));
-    change_current_state(get_current_result() == ISR_NONE ? IS_WAIT_COND : IS_WAIT_THEN);
+    change_current_state(cmd_exec(cmd));
 }
 
 //exit shell and parse a return code
@@ -180,18 +178,27 @@ static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
 
+/*
 static int is_in_block(enum if_state_t st, enum if_stat_result_t res){
     return (st == IS_NONE ||
      (st == IS_THEN_BLOCK && res  == ISR_SUCCESS) ||
      (st == IS_ELSE_BLOCK && res  == ISR_FAILURE));
+}
+*/
+static int is_skip_block(){
+    enum if_state_t st = get_current_state();
+    if(st == IS_SKIPPING_THEN || st == IS_SKIPPING_ELSE)
+        return 1;
+    else
+        return 0;
 }
 
 static void choose_to_exec(cmd_t cmd){
     switch (get_keyword_type(*cmd)) {
         case C_EXIT:       exit_shell(cmd); return;
         case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
-        case C_THEN:       if(!process_then_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   change program state and
-        case C_ELSE:       if(!process_else_keyword(cmd)) return; cmd++; break;     //skip exec if is not in block      *   execute a command if exist
+        case C_THEN:       process_then_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   change program state and
+        case C_ELSE:       process_else_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   execute a command if exist
         case C_FI:         process_fi_keyword(cmd); cmd++; break;                   //pop 'if' block                    *
         case C_ASSIGN:     set_variable(*cmd, 0); cmd++; break;
         case C_SET:        print_var_table(1); return;
@@ -202,9 +209,10 @@ static void choose_to_exec(cmd_t cmd){
         case C_NONE:
         default: break;
     }
-    if(get_current_state() == IS_WAIT_COND)
+    if(!is_skip_block()){
+        if(get_current_state() == IS_WAIT_COND)
             if_statement_exec(cmd);
-    else if(is_in_block(get_current_state(), get_current_result())) {
+        else 
             cmd_exec(cmd);
     }
 }
