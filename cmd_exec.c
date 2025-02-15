@@ -1,8 +1,9 @@
 #include "cmd_exec.h"
-#include "if_stack.h"
+#include "if_state.h"
 #include "token.h"
 #include "utils.h"
 #include "var_table.h"
+#include "cmd_block.h"
 #include <complex.h>
 #include <limits.h>
 #include <stdio.h>
@@ -34,8 +35,8 @@ static void process_else_keyword(cmd_t cmd);
 //check validity and change the program state
 static void process_fi_keyword(cmd_t cmd);
 
-//choose how to execute a command
-static void choose_to_exec(cmd_t cmd);
+//choose how to execute a command, return cmd_exec result or 1
+static int choose_to_exec(cmd_t cmd);
 
 //seek for variable and replace them with their values, must call free()
 static char* replace_variables(char*);
@@ -43,8 +44,8 @@ static char* replace_variables(char*);
 //print syntax error 'unexpected token' and change 'if_state' to IS_NONE
 static void print_synt_err(cmd_t cmd);
 
-//execute command and return the exit code
-static enum if_state_t cmd_exec(cmd_t args);
+//execute command and return 1 on success, 0 otherwise
+static int cmd_exec(cmd_t args);
 
 //return keyword type of a string
 static cmd_type_t get_cmd_type(char* s);
@@ -83,9 +84,9 @@ char* get_shell_cmd(){
 }
 
 //execute command and return the exit code, return IS_SUCCEEDED or IS_FAILED
-static enum if_state_t cmd_exec(cmd_t args){
+static int cmd_exec(cmd_t args){
     if (args[0] == NULL || (cmd_info & CMD_ERR)) {
-        return IS_FAILED;
+        return 0;
     }
 
     int background_mode;
@@ -104,7 +105,7 @@ static enum if_state_t cmd_exec(cmd_t args){
     __pid_t r = fork();
     if(r == -1){
         perror("fork()");
-        return IS_FAILED;
+        return 0;
     }
     if(r == 0){
         struct sigaction sgnl;
@@ -122,13 +123,13 @@ static enum if_state_t cmd_exec(cmd_t args){
     }else{
         children_count++;
         //wait for execution or not
-        if(!background_mode || get_current_state() == IS_WAIT_COND){
+        if(!background_mode /*|| get_if_state() == IS_WAIT_COND*/){
             int stat_loc;
             wait(&stat_loc);
-            r = WEXITSTATUS(stat_loc) == 0 ? IS_SUCCEEDED : IS_FAILED;
+            r = WEXITSTATUS(stat_loc) == 0 ? 1 : 0;
         }else{
             printf("[%d] %d\n", children_count, r);
-            r = IS_SUCCEEDED;
+            r = 1;
         }
     }
 
@@ -161,9 +162,9 @@ static cmd_type_t get_keyword_type(char* s){
     return C_NONE;
 }
 
+/*
 //if 'if' keyword found try to execute condition statement and change the program state
 static int process_if_keyword(cmd_t cmd){
-    enum if_state_t st = get_current_state();
     if(get_keyword_type(cmd[0]) != C_IF || st == IS_WAIT_COND || st == IS_SUCCEEDED || st == IS_FAILED){
         print_synt_err(cmd);
         return 0;
@@ -171,35 +172,36 @@ static int process_if_keyword(cmd_t cmd){
         push_if_statement(IS_WAIT_COND);
         return 1;
     }
-}
-
+        */
+/*
 static void process_then_keyword(cmd_t cmd){
-    enum if_state_t st = get_current_state();
+    enum if_exec_stat_t st = get_if_state();
     if(get_keyword_type(cmd[0]) == C_THEN && (st == IS_FAILED || st == IS_SUCCEEDED))
-        change_current_state(st == IS_SUCCEEDED ? IS_DOING_THEN : IS_SKIPPING_THEN);
+        change_if_state(st == IS_SUCCEEDED ? IS_DOING_THEN : IS_SKIPPING_THEN);
     else
         print_synt_err(cmd);
 }
 
 static void process_else_keyword(cmd_t cmd){
-    enum if_state_t st = get_current_state();
+    enum if_exec_stat_t st = get_if_state();
     if(get_keyword_type(cmd[0]) == C_ELSE && (st == IS_SKIPPING_THEN || st == IS_DOING_THEN))
-        change_current_state(st == IS_SKIPPING_THEN ? IS_DOING_ELSE : IS_SKIPPING_ELSE);
+        change_if_state(st == IS_SKIPPING_THEN ? IS_DOING_ELSE : IS_SKIPPING_ELSE);
     else
         print_synt_err(cmd);
 }
 
+
 static void process_fi_keyword(cmd_t cmd){
-    enum if_state_t st = get_current_state();
+    enum if_exec_stat_t st = get_if_state();
     if(get_keyword_type(cmd[0]) == C_FI && (IS_SKIPPING_ELSE >= st && st >= IS_DOING_THEN))
         pop_if_statement();
     else
         print_synt_err(cmd);
 }
-
+*/
 //execute if statement and change the program state
 static void if_statement_exec(cmd_t cmd){
-    change_current_state(cmd_exec(cmd));
+    change_if_state(cmd_exec(cmd));
 }
 
 //exit shell and parse a return code
@@ -207,37 +209,42 @@ static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
 
-// /media/energyc0/sdb2/programming/repos/unix_programming/chapter-8/waitdemo2.out 3
+/*
 static int is_skip_block(){
-    enum if_state_t st = get_current_state();
+    enum if_exec_stat_t st = get_if_state();
     if(st == IS_SKIPPING_THEN || st == IS_SKIPPING_ELSE)
         return 1;
     else
         return 0;
 }
+        */
 
-static void choose_to_exec(cmd_t cmd){
-    switch (get_keyword_type(*cmd)) {
-        case C_EXIT:       exit_shell(cmd); return;
-        case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
-        case C_THEN:       process_then_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   change program state and
-        case C_ELSE:       process_else_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   execute a command if exist
-        case C_FI:         process_fi_keyword(cmd); cmd++; break;                   //pop 'if' block                    *
-        case C_ASSIGN:     set_variable(*cmd, 0); cmd++; break;
-        case C_SET:        print_var_table(1); return;
-        case C_UNSET:      unset_table_vars(cmd); return;
-        case C_ENV:        print_var_table(0); return;
-        case C_EXPORT:     export_table_vars(cmd); return;
-        case C_READ:       read_variable(cmd); return;
-        case C_NONE:
-        default: break;
+static int choose_to_exec(cmd_t cmd){
+    cmd_type_t c_t = get_keyword_type(cmd[0]); 
+    if(!preserve_cmd(cmd, c_t)){
+        switch (c_t) {
+            case C_EXIT:       exit_shell(cmd); return  1;
+            //case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
+            //case C_THEN:       process_then_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   change program state and
+            //case C_ELSE:       process_else_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   execute a command if exist
+            case C_FI:         cmd++; break;                   //pop 'if' block                    *
+            case C_ASSIGN:     set_variable(*cmd, 0); cmd++; break;
+            case C_SET:        print_var_table(1); return 1;
+            case C_UNSET:      unset_table_vars(cmd); return 1;
+            case C_ENV:        print_var_table(0); return 1;
+            case C_EXPORT:     export_table_vars(cmd); return 1;
+            case C_READ:       read_variable(cmd); return 1;
+            case C_NONE:
+            default: break;
+        }
+        //if(!is_skip_block()){
+         //   if(get_if_state() == IS_WAIT_COND)
+         //       if_statement_exec(cmd);
+         //   else 
+                return cmd_exec(cmd);
+        //}
     }
-    if(!is_skip_block()){
-        if(get_current_state() == IS_WAIT_COND)
-            if_statement_exec(cmd);
-        else 
-            cmd_exec(cmd);
-    }
+    return 1;
 }
 
 void process_shell_cmds(char* args){
@@ -252,7 +259,7 @@ void process_shell_cmds(char* args){
 //print syntax error 'unexpected token', change 'if_state' to IS_NONE and set CMD_ERR flag
 static void print_synt_err(cmd_t cmd){
     printf("unexpected token '%s'\n", cmd[0]);
-    clear_if_stack();
+    //clear_if_stack();
     cmd_info |= CMD_ERR;
 }
 
@@ -347,4 +354,20 @@ void setup_child_sighandler(){
         perror("sigaction");
         exit(EXIT_FAILURE);    
     }
+}
+
+//execute command block
+void exec_cmd_block(struct cmd_block* cmd_blk){
+    for(int i = 0; i < cmd_blk->p; i++){
+        choose_to_exec(cmd_blk->data[i]);
+    }
+}
+
+//execute cmd block and return 1 if any of them have returned success
+int exec_condition(struct cmd_block* cmd_blk){
+    int res = 0;
+    for(int i = 0; i < cmd_blk->p; i++){
+        res |= choose_to_exec(cmd_blk->data[i]);
+    }
+    return res;
 }

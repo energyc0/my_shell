@@ -31,6 +31,9 @@ cmd_arr_t splitline_cmd(char* cmd_buf);
 //allocate cmd_t with NULL end identifier, must call free()
 cmd_t splitcmd_tokens(char* cmd_buf);
 
+//alloc new copy of cmd
+cmd_t copy_cmd(cmd_t cmd);
+
 //print cmd
 void print_cmd(cmd_t cmd);
 

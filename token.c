@@ -124,3 +124,18 @@ void free_cmd_arr(cmd_arr_t p){
     }
     free(temp);
 }
+
+
+//alloc new copy of cmd
+cmd_t copy_cmd(cmd_t cmd){
+    int sz = 0;
+    while (cmd[sz]) {
+        sz++;
+    }
+    cmd_t ptr = emalloc(sizeof(token_t) * (sz+1));
+    for(int i = 0; i < sz; i++){
+        ptr[i] = newstr(cmd[i]);
+    }
+    ptr[sz] = NULL;
+    return ptr;
+}

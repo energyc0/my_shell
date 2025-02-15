@@ -23,3 +23,12 @@ void* erealloc(void* p,size_t size){
     }
     return p;
 }
+
+void* ecalloc(unsigned long nmemb, size_t size){
+    void* ptr;
+    if((ptr = calloc(nmemb,size)) == NULL){
+        perror("calloc()");
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}

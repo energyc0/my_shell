@@ -1,6 +1,7 @@
 #include "mysh.h"
 #include "cmd_exec.h"
 #include "var_table.h"
+#include "if_state.h"
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
@@ -17,6 +18,7 @@ void setup_shell(){
     sigaction(SIGINT, &sgnl, NULL);
     sigaction(SIGQUIT, &sgnl, NULL);
 
+    setup_if_state_buffer();
     setup_child_sighandler();
     table_setup();
 }
