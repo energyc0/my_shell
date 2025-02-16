@@ -1,21 +1,37 @@
 #include "token.h"
 #include "utils.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <string.h>
 
 #define MAX_COMMANDS_PER_LINE 64
+#define TOKEN_ALLOC_CHUNK 20
 
-//just free()
-#define FREE_TOKEN(p) {free(p);}
+struct token_arr{
+    token_t* arr;
+    size_t sz;
+    size_t p;
+};
 
-//allocate command array, must call free()
+//push token allocated with alloc_*_token() to the token_arr and allocate new space if needed
+static void push_token(struct token_arr* p, token_t t);
+static void realloc_token_arr(struct token_arr* p);
+
+//call free() on every token_arr entry , make arr->p = 0
+static void clear_token_arr(struct token_arr* arr);
+
+//return token array with NULL end identifier, must call free()
+static cmd_t splitcmd_tokens(char* cmd_buf);
+
+//allocate command array, using bufferisation, freeing previous cmd_arr
 cmd_arr_t splitline_cmd(char* arg_buf){
+    static cmd_arr_t cmds = NULL;
     char* prev = arg_buf;
     char* p = arg_buf;
 
-    cmd_arr_t cmds = emalloc(sizeof(cmd_arr_t) * MAX_COMMANDS_PER_LINE);
+    free_cmd_arr(cmds);
+    if(cmds == NULL)
+        cmds = emalloc(sizeof(cmd_arr_t) * MAX_COMMANDS_PER_LINE);
     int i = 0;
 
     while (1) {
@@ -30,6 +46,7 @@ cmd_arr_t splitline_cmd(char* arg_buf){
         char ch = *p;
         *p = '\0';
         cmds[i++] = splitcmd_tokens(prev);
+        printf("%s\n", *cmds[i-1]);
         if((*p = ch) == '\0')
             break;
 
@@ -39,12 +56,60 @@ cmd_arr_t splitline_cmd(char* arg_buf){
     return cmds;
 }
 
-//allocate token array with NULL end identifier, must call free();
-cmd_t splitcmd_tokens(char* cmd_buf){
-    char* p = cmd_buf;
+//allocate new token, must call free_token()
+token_t mktoken(char* s){
+    token_t ptr = newstr(s);
+    return ptr;
+}
 
+//print token value
+void print_token(const token_t p){
+    if (p == NULL) {
+        fprintf(stderr, "token is NULL!\n");
+    }else{
+        printf("%s", p);
+    }
+}
+//print cmd
+void print_cmd(cmd_t cmd){
+    while (*cmd) {
+        print_token(*cmd++);
+        putchar(' ');
+    }
+}
+//free cmd_t entries
+void free_cmd(cmd_t p){
+    while(*p){
+        FREE_TOKEN(*p++);
+    }
+}
+//free cmd_arr_t entries
+void free_cmd_arr(cmd_arr_t p){
+    if(p){
+        while(*p){
+            free_cmd(*p++);
+        }
+    }
+}
+//alloc new copy of cmd
+cmd_t copy_cmd(cmd_t cmd){
+    int sz = 0;
+    while (cmd[sz]) {
+        sz++;
+    }
+    cmd_t ptr = emalloc(sizeof(token_t) * (sz+1));
+    for(int i = 0; i < sz; i++){
+        ptr[i] = newstr(cmd[i]);
+    }
+    ptr[sz] = NULL;
+    return ptr;
+}
+
+//return token array with NULL end identifier, must call free()
+static cmd_t splitcmd_tokens(char* cmd_buf){
+    char* p = cmd_buf;
     struct token_arr arr;
-    memset(&arr, 0, sizeof arr);
+    memset(&arr,0,sizeof arr);
 
     for (char* prev; *p ; prev = p) {
         while(*p != '\0' && isspace(*p)) p++;
@@ -63,19 +128,11 @@ cmd_t splitcmd_tokens(char* cmd_buf){
     return arr.arr;
 }
 
-//allocate new token, must call free_token()
-token_t mktoken(char* s){
-    token_t ptr = newstr(s);
-    return ptr;
-}
-
-#define TOKEN_ALLOC_CHUNK 20
-
-void realloc_token_arr(struct token_arr* p){
+static void realloc_token_arr(struct token_arr* p){
     p->sz += TOKEN_ALLOC_CHUNK;
     p->arr = erealloc(p->arr, p->sz * sizeof(token_t));
 }
-void push_token(struct token_arr* ptr, token_t t){
+static void push_token(struct token_arr* ptr, token_t t){
     if(ptr->p >= ptr->sz){
         realloc_token_arr(ptr);
     }
@@ -83,59 +140,10 @@ void push_token(struct token_arr* ptr, token_t t){
     ptr->arr[ptr->p++] = t;
 }
 
-void clear_token_arr(struct token_arr* arr){
+//call free() on every token_arr entry , make arr->p = 0
+static void clear_token_arr(struct token_arr* arr){
     for(int i = 0; i < arr->p; i++){
         free(arr->arr[i]);
     }
-    free(arr->arr);
-    arr->arr = NULL;
     arr->p = 0;
-    arr->sz = 0;
-}
-
-//print token value
-void print_token(const token_t p){
-    if (p == NULL) {
-        fprintf(stderr, "token is NULL!\n");
-    }else{
-        printf("%s", p);
-    }
-}
-//print cmd
-void print_cmd(cmd_t cmd){
-    while (*cmd) {
-        print_token(*cmd++);
-        putchar(' ');
-    }
-}
-
-void free_cmd(cmd_t p){
-    cmd_t temp = p;
-    while(*p){
-        FREE_TOKEN(*p++);
-    }
-    free(temp);
-}
-
-void free_cmd_arr(cmd_arr_t p){
-    cmd_arr_t temp = p;
-    while(*p){
-        free_cmd(*p++);
-    }
-    free(temp);
-}
-
-
-//alloc new copy of cmd
-cmd_t copy_cmd(cmd_t cmd){
-    int sz = 0;
-    while (cmd[sz]) {
-        sz++;
-    }
-    cmd_t ptr = emalloc(sizeof(token_t) * (sz+1));
-    for(int i = 0; i < sz; i++){
-        ptr[i] = newstr(cmd[i]);
-    }
-    ptr[sz] = NULL;
-    return ptr;
 }

@@ -74,7 +74,6 @@ static int children_count = 0;
 
 //get user input, must call free()
 char* get_shell_cmd(){
-
     printf(PROMPT);fflush(stdin);
     if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
         return NULL;
@@ -162,43 +161,6 @@ static cmd_type_t get_keyword_type(char* s){
     return C_NONE;
 }
 
-/*
-//if 'if' keyword found try to execute condition statement and change the program state
-static int process_if_keyword(cmd_t cmd){
-    if(get_keyword_type(cmd[0]) != C_IF || st == IS_WAIT_COND || st == IS_SUCCEEDED || st == IS_FAILED){
-        print_synt_err(cmd);
-        return 0;
-    }else{
-        push_if_statement(IS_WAIT_COND);
-        return 1;
-    }
-        */
-/*
-static void process_then_keyword(cmd_t cmd){
-    enum if_exec_stat_t st = get_if_state();
-    if(get_keyword_type(cmd[0]) == C_THEN && (st == IS_FAILED || st == IS_SUCCEEDED))
-        change_if_state(st == IS_SUCCEEDED ? IS_DOING_THEN : IS_SKIPPING_THEN);
-    else
-        print_synt_err(cmd);
-}
-
-static void process_else_keyword(cmd_t cmd){
-    enum if_exec_stat_t st = get_if_state();
-    if(get_keyword_type(cmd[0]) == C_ELSE && (st == IS_SKIPPING_THEN || st == IS_DOING_THEN))
-        change_if_state(st == IS_SKIPPING_THEN ? IS_DOING_ELSE : IS_SKIPPING_ELSE);
-    else
-        print_synt_err(cmd);
-}
-
-
-static void process_fi_keyword(cmd_t cmd){
-    enum if_exec_stat_t st = get_if_state();
-    if(get_keyword_type(cmd[0]) == C_FI && (IS_SKIPPING_ELSE >= st && st >= IS_DOING_THEN))
-        pop_if_statement();
-    else
-        print_synt_err(cmd);
-}
-*/
 //execute if statement and change the program state
 static void if_statement_exec(cmd_t cmd){
     change_if_state(cmd_exec(cmd));
@@ -209,25 +171,12 @@ static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
 
-/*
-static int is_skip_block(){
-    enum if_exec_stat_t st = get_if_state();
-    if(st == IS_SKIPPING_THEN || st == IS_SKIPPING_ELSE)
-        return 1;
-    else
-        return 0;
-}
-        */
-
 static int choose_to_exec(cmd_t cmd){
     cmd_type_t c_t = get_keyword_type(cmd[0]); 
     if(!preserve_cmd(cmd, c_t)){
         switch (c_t) {
             case C_EXIT:       exit_shell(cmd); return  1;
-            //case C_IF:         if(process_if_keyword(cmd)) cmd++; break;;               //push 'if' block into stack        *   
-            //case C_THEN:       process_then_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   change program state and
-            //case C_ELSE:       process_else_keyword(cmd); cmd++; break;     //skip exec if is not in block      *   execute a command if exist
-            case C_FI:         cmd++; break;                   //pop 'if' block                    *
+            case C_FI:         cmd++; break;
             case C_ASSIGN:     set_variable(*cmd, 0); cmd++; break;
             case C_SET:        print_var_table(1); return 1;
             case C_UNSET:      unset_table_vars(cmd); return 1;
@@ -237,12 +186,7 @@ static int choose_to_exec(cmd_t cmd){
             case C_NONE:
             default: break;
         }
-        //if(!is_skip_block()){
-         //   if(get_if_state() == IS_WAIT_COND)
-         //       if_statement_exec(cmd);
-         //   else 
-                return cmd_exec(cmd);
-        //}
+        return cmd_exec(cmd);
     }
     return 1;
 }
@@ -252,7 +196,6 @@ void process_shell_cmds(char* args){
     for (cmd_arr_t ptr = tok_vec;*ptr; ptr++) {
         choose_to_exec(*ptr);
     }
-    free_cmd_arr(tok_vec);
     cmd_info &= (~CMD_ERR);
 }
 
