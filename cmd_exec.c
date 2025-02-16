@@ -1,7 +1,7 @@
 #include "cmd_exec.h"
 #include "if_state.h"
 #include "token.h"
-#include "utils.h"
+#include "user_input.h"
 #include "var_table.h"
 #include "cmd_block.h"
 #include <complex.h>
@@ -14,9 +14,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
-#define PROMPT ">"
-#define MAX_VARIABLE_IN_CMD 256
 
 extern char** environ;
 
@@ -34,9 +31,6 @@ static void process_else_keyword(cmd_t cmd);
 
 //check validity and change the program state
 static void process_fi_keyword(cmd_t cmd);
-
-//choose how to execute a command, return cmd_exec result or 1
-static int choose_to_exec(cmd_t cmd);
 
 //seek for variable and replace them with their values, must call free()
 static char* replace_variables(char*);
@@ -68,19 +62,8 @@ static void sigchld_handler(int code);
 //cmd_info flags
 #define CMD_ERR     1   //is error command
 static int cmd_info;
-static char cmd_buf[BUFSIZ];
 
 static int children_count = 0;
-
-//get user input, must call free()
-char* get_shell_cmd(){
-    printf(PROMPT);fflush(stdin);
-    if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
-        return NULL;
-    }
-    cmd_buf[strlen(cmd_buf)-1] = '\0';
-    return replace_variables(cmd_buf);
-}
 
 //execute command and return the exit code, return IS_SUCCEEDED or IS_FAILED
 static int cmd_exec(cmd_t args){
@@ -171,7 +154,7 @@ static void exit_shell(cmd_t args){
     exit((args[0] == NULL || args[1] == NULL) ? 0 : atoi(args[1]));
 }
 
-static int choose_to_exec(cmd_t cmd){
+int choose_to_exec(cmd_t cmd){
     cmd_type_t c_t = get_keyword_type(cmd[0]); 
     if(!preserve_cmd(cmd, c_t)){
         switch (c_t) {
@@ -206,54 +189,6 @@ static void print_synt_err(cmd_t cmd){
     cmd_info |= CMD_ERR;
 }
 
-//seek for variable and replace them with their values, must call free()
-static char* replace_variables(char* cmd_buf){
-    char* p = cmd_buf;
-    char* var_name_start;
-    char* found_variables[MAX_VARIABLE_IN_CMD];
-    int var_count = 0;
-    int new_length = strlen(cmd_buf);
-
-    //search variables in buffer and add them to the 'found_variables' array, calculate new length
-    while ((var_name_start = strchr(p, '$')) != NULL) {
-        if(*++var_name_start == '\0')
-            break;
-        
-        if(var_count >= MAX_VARIABLE_IN_CMD){
-            fprintf(stderr, "variables in command limit exceeded!\n");
-            exit(EXIT_FAILURE);
-        }
-
-        char* var_name_end;
-        for (var_name_end = var_name_start; IS_VAR_SYM(*var_name_end); var_name_end++);
-
-        char temp = *var_name_end;
-        *var_name_end = '\0';
-        found_variables[var_count] = var_table_find(var_name_start);
-        new_length += (strlen(found_variables[var_count++]) - (var_name_end - var_name_start)) - 1;
-        *var_name_end = temp;
-        p = var_name_end;
-    }
-
-    //allocate new string and replace all the variables with 'found_variables' array
-    char* replaced_str = emalloc(new_length + 1);
-    memset(replaced_str, '\0', new_length+1);
-    char* insert_ptr = replaced_str;
-    p = cmd_buf;
-    int i = 0;
-    while ((var_name_start = strchr(p, '$')) != NULL) {
-        insert_ptr = strncat(insert_ptr, p, var_name_start-p);
-        if(*++var_name_start == '\0')
-            break;
-        for (; IS_VAR_SYM(*var_name_start); var_name_start++);
-        strcat(insert_ptr, found_variables[i++]);
-        p = var_name_start;
-    }
-    strcat(insert_ptr, p);
-    replaced_str[new_length] = '\0';
-    return replaced_str;
-}
-
 //delete variables from the table
 static void unset_table_vars(cmd_t cmd){
     while(*++cmd != NULL)
@@ -267,15 +202,10 @@ static void export_table_vars(cmd_t cmd){
 }
 
 static void read_variable(cmd_t cmd){
-    if(fgets(cmd_buf, BUFSIZ, stdin) == NULL){
-        perror("fgets()");
-        exit(EXIT_FAILURE);
-    }
-    int len = strlen(cmd_buf);
+    char* user_input = get_user_input();
 
-    cmd_buf[len-1]='\0';
-    char temp[len + strlen(cmd[1]) + 2];
-    sprintf(temp, "%s=%s", cmd[1], cmd_buf);
+    char temp[strlen(user_input) + strlen(cmd[1]) + 2];
+    sprintf(temp, "%s=%s", cmd[1], user_input);
     set_variable(temp, 0);
 }
 

@@ -1,2 +1,2 @@
-mysh.out: main.c mysh.c mysh.h cmd_exec.h cmd_exec.c utils.c utils.h token.h token.c if_state.h if_state.c var_table.h var_table.c cmd_block.h cmd_block.c
-	cc main.c mysh.c cmd_exec.c utils.c token.c if_state.c var_table.c cmd_block.c -o mysh.out -g
+mysh.out: main.c mysh.c mysh.h cmd_exec.h cmd_exec.c utils.c utils.h token.h token.c if_state.h if_state.c var_table.h var_table.c cmd_block.h cmd_block.c user_input.c user_input.h
+	cc main.c mysh.c cmd_exec.c utils.c token.c if_state.c var_table.c cmd_block.c user_input.c -o mysh.out -g

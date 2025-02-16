@@ -16,7 +16,7 @@ token_t mktoken(char* s);
 //print token value
 void print_token(const token_t p);
 
-//allocate command array, using bufferisation, freeing previous cmd_arr
+//return next command array
 cmd_arr_t splitline_cmd(char* cmd_buf);
 
 //alloc new copy of cmd

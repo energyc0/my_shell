@@ -23,7 +23,7 @@ static void clear_token_arr(struct token_arr* arr);
 //return token array with NULL end identifier, must call free()
 static cmd_t splitcmd_tokens(char* cmd_buf);
 
-//allocate command array, using bufferisation, freeing previous cmd_arr
+//return next command array
 cmd_arr_t splitline_cmd(char* arg_buf){
     static cmd_arr_t cmds = NULL;
     char* prev = arg_buf;
@@ -46,7 +46,6 @@ cmd_arr_t splitline_cmd(char* arg_buf){
         char ch = *p;
         *p = '\0';
         cmds[i++] = splitcmd_tokens(prev);
-        printf("%s\n", *cmds[i-1]);
         if((*p = ch) == '\0')
             break;
 

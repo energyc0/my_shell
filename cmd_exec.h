@@ -33,15 +33,12 @@ typedef enum cmd_type_t{
 
 void setup_child_sighandler();
 
-//parse user input and execute commands
-void process_shell_cmds(char *args);
+//choose how to execute a command, return cmd_exec result or 1
+int choose_to_exec(cmd_t cmd);
 
 //execute cmd block
 void exec_cmd_block(struct cmd_block* cmd_blk);
 
 //execute cmd block and return 1 if any of them have returned success
 int exec_condition(struct cmd_block* cmd_blk);
-
-//get user input and return it in buffer
-char* get_shell_cmd();
 #endif
